@@ -123,9 +123,8 @@ jobs:
 
       - name: Create and push manifest
         run: |
-          # Get the first tag from the metadata
-          TAGS="${{ steps.meta.outputs.tags }}"
-          for TAG in $TAGS; do
+          # Parse tags from JSON output and create manifests
+          echo '${{ steps.meta.outputs.json }}' | jq -r '.tags[]' | while IFS= read -r TAG; do
             echo "Creating manifest for $TAG"
             docker buildx imagetools create -t "$TAG" \
               "$TAG-amd64" \
