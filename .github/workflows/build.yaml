@@ -60,8 +60,10 @@ jobs:
             type=semver,pattern={{major}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
+          flavor: |
+            latest=false
 
-      - name: Determine base image
+      - name: Determine base image and architecture
         id: base-image
         run: |
           case "${{ matrix.platform }}" in
@@ -79,6 +81,12 @@ jobs:
               ;;
           esac
 
+      - name: Generate tags with architecture suffix
+        id: arch-tags
+        run: |
+          TAGS=$(echo '${{ steps.meta.outputs.json }}' | jq -r '.tags[]' | sed "s/$/-${{ steps.base-image.outputs.arch }}/" | tr '\n' ',' | sed 's/,$//')
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -87,7 +95,7 @@ jobs:
           build-args: |
             BUILD_FROM=${{ steps.base-image.outputs.base }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}-${{ steps.base-image.outputs.arch }}
+          tags: ${{ steps.arch-tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
