@@ -1,0 +1,55 @@
+#include <tunables/global>
+
+profile scanner flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  capability setgid,
+  capability setuid,
+
+  # Python
+  /usr/bin/python3 rix,
+  /usr/bin/python* rix,
+
+  # System libraries
+  /lib/** mr,
+  /usr/lib/** mr,
+  /usr/local/lib/** mr,
+
+  # Application files
+  /opt/scanner/** r,
+
+  # Data and configuration
+  /data/** rw,
+  /media/** rw,
+  /share/** rw,
+
+  # Device access for scanners
+  /dev/bus/usb/** rw,
+  /dev/usb/** rw,
+
+  # Network for eSCL scanners and Telegram
+  network inet dgram,
+  network inet stream,
+
+  # System files
+  /etc/passwd r,
+  /etc/group r,
+  /etc/nsswitch.conf r,
+  /etc/resolv.conf r,
+  /etc/ssl/certs/** r,
+
+  # Proc and sys
+  @{PROC}/sys/kernel/random/uuid r,
+  /sys/bus/ r,
+  /sys/class/ r,
+  /sys/devices/** r,
+
+  # Temporary files
+  /tmp/** rw,
+  /var/tmp/** rw,
+
+  # SANE configuration
+  /etc/sane.d/** r,
+  /usr/share/sane/** r,
+}

@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Take down the scanner service
+# ==============================================================================
+
+bashio::log.info "Scanner service stopped"

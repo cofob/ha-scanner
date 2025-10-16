@@ -1,0 +1,54 @@
+name: "Libinsane Scanner"
+version: "0.1.0"
+slug: "scanner"
+description: "Scan documents using libinsane with Telegram integration"
+url: "https://github.com/cofob/print-scanner"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: services
+boot: auto
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: "HTTP API for manual scan triggers"
+map:
+  - media:rw
+  - share:rw
+usb: true
+devices:
+  - /dev/bus/usb:/dev/bus/usb:rwm
+full_access: false
+audio: false
+host_network: false
+stdin: true
+options:
+  device_id: ""
+  output_format: "jpeg"
+  quality: 90
+  filename_pattern: "scan_{datetime}_{page}.{format}"
+  save_to: "media"
+  subdir: "scanner"
+  resolution: 300
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""
+    caption: "Scanned document"
+    use_album: true
+schema:
+  device_id: str
+  output_format: list(jpeg|png)
+  quality: int(1,100)
+  filename_pattern: str
+  save_to: list(media|share)
+  subdir: str
+  resolution: int(75,1200)
+  telegram:
+    enabled: bool
+    bot_token: str?
+    chat_id: str?
+    caption: str?
+    use_album: bool
+image: "ghcr.io/cofob/ha-scanner"
