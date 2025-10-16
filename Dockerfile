@@ -56,7 +56,8 @@ RUN git clone --depth=1 https://gitlab.gnome.org/World/OpenPaperwork/libinsane.g
     rm -rf /tmp/libinsane
 
 # Install uv package manager
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    mv ~/.local/bin/uv /usr/local/bin/uv
 
 # Set working directory for our application
 WORKDIR /opt/scanner
@@ -84,7 +85,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --python=python3 --break-system-packages -e .
 
 # Copy Home Assistant addon rootfs
-COPY addon/scanner/rootfs /
+COPY rootfs /
 
 # Make scripts executable
 RUN chmod +x /etc/services.d/scanner/run \
