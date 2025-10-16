@@ -70,14 +70,17 @@ jobs:
             linux/amd64)
               echo "base=ghcr.io/home-assistant/amd64-base-debian:bookworm" >> $GITHUB_OUTPUT
               echo "arch=amd64" >> $GITHUB_OUTPUT
+              echo "build_arch=x86_64" >> $GITHUB_OUTPUT
               ;;
             linux/arm64)
               echo "base=ghcr.io/home-assistant/aarch64-base-debian:bookworm" >> $GITHUB_OUTPUT
               echo "arch=aarch64" >> $GITHUB_OUTPUT
+              echo "build_arch=aarch64" >> $GITHUB_OUTPUT
               ;;
             linux/arm/v7)
               echo "base=ghcr.io/home-assistant/armv7-base-debian:bookworm" >> $GITHUB_OUTPUT
               echo "arch=armv7" >> $GITHUB_OUTPUT
+              echo "build_arch=armhf" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -94,6 +97,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             BUILD_FROM=${{ steps.base-image.outputs.base }}
+            BUILD_ARCH=${{ steps.base-image.outputs.build_arch }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.arch-tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
