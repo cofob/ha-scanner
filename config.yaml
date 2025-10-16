@@ -1,8 +1,8 @@
 name: "Libinsane Scanner"
 version: "0.1.0"
-slug: "scanner"
+slug: "ha_scanner"
 description: "Scan documents using libinsane with Telegram integration"
-url: "https://github.com/cofob/print-scanner"
+url: "https://github.com/cofob/ha-scanner"
 arch:
   - amd64
   - aarch64
