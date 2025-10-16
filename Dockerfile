@@ -30,13 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-gi \
     python3-dev \
     python3-venv \
-    # Image libraries (for PIL)
-    libjpeg62-turbo \
-    libtiff6 \
-    libpng16-16 \
-    libwebp7 \
-    zlib1g \
-    libopenjp2-7 \
+    python3-pil \
     # System utilities
     ca-certificates \
     curl \
@@ -65,7 +59,7 @@ WORKDIR /opt/scanner
 # Copy project files first for dependency resolution
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies directly with uv pip, excluding pygobject (use system version)
+# Install dependencies directly with uv pip, excluding pygobject and pillow (use system versions)
 # Override external management for container environment
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --python=python3 --break-system-packages \
@@ -73,8 +67,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         "uvicorn[standard]>=0.24.0" \
         "httpx>=0.25.0" \
         "pydantic>=2.5.0" \
-        "python-json-logger>=2.0.0" \
-        "pillow>=12.0.0"
+        "python-json-logger>=2.0.0"
 
 # Copy project source files
 COPY app ./app
