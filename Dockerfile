@@ -80,11 +80,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy Home Assistant addon rootfs
 COPY rootfs /
 
-# Make scripts executable
+# Make scripts and init executable
 RUN chmod +x /etc/services.d/scanner/run \
     && chmod +x /etc/services.d/scanner/finish \
     && chmod +x /etc/cont-init.d/10-config \
-    && chmod +x /usr/local/bin/run.sh
+    && chmod +x /usr/local/bin/run.sh \
+    && chmod +x /init
 
 # Clean up build dependencies to reduce image size
 RUN apt-get purge -y \
