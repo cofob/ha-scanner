@@ -14,6 +14,6 @@ cd /opt/scanner
 #     sane-find-scanner 2>/dev/null || echo "No SANE devices found or permission denied"
 # fi
 
-# # Start the Python application
-# echo "Starting Scanner Add-on service..."
+# Start the Python application
+echo "Starting Scanner Add-on service..."
 exec python3 -m app.main

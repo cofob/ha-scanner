@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsane1 libsane-dev sane-utils sane-airscan udev \
     libgirepository1.0-dev gobject-introspection \
     python3 python3-gi python3-pil python3-fastapi python3-uvicorn python3-httpx python3-pydantic \
-    ca-certificates curl \
+    ca-certificates curl avahi-daemon dbus libnss-mdns \
     && rm -rf /var/lib/apt/lists/*
 
 # Build and install libinsane from source
@@ -28,6 +28,10 @@ COPY rootfs/ /
 RUN chmod a+x /etc/cont-init.d/10-config \
     /etc/services.d/scanner/finish \
     /etc/services.d/scanner/run \
+    /etc/services.d/avahi-daemon/run \
+    /etc/services.d/avahi-daemon/finish \
+    /etc/services.d/dbus/run \
+    /etc/services.d/dbus/finish \
     /usr/local/bin/run.sh && \
     cp /usr/local/bin/run.sh /run.sh
 

@@ -5,41 +5,51 @@
 
 bashio::log.info "Configuring Scanner Add-on..."
 
-# Get configuration values
-SAVE_TO=$(bashio::config "save_to")
-SUBDIR=$(bashio::config "subdir")
-TELEGRAM_ENABLED=$(bashio::config "telegram.enabled")
-TELEGRAM_TOKEN=$(bashio::config "telegram.bot_token")
-TELEGRAM_CHAT_ID=$(bashio::config "telegram.chat_id")
+# # Get configuration values
+# SAVE_TO=$(bashio::config "save_to")
+# SUBDIR=$(bashio::config "subdir")
+# TELEGRAM_ENABLED=$(bashio::config "telegram.enabled")
+# TELEGRAM_TOKEN=$(bashio::config "telegram.bot_token")
+# TELEGRAM_CHAT_ID=$(bashio::config "telegram.chat_id")
 
-# Create output directory
-if [ "$SAVE_TO" = "media" ]; then
-    OUTPUT_DIR="/media/$SUBDIR"
-else
-    OUTPUT_DIR="/share/$SUBDIR"
-fi
+# # Create output directory
+# if [ "$SAVE_TO" = "media" ]; then
+#     OUTPUT_DIR="/media/$SUBDIR"
+# else
+#     OUTPUT_DIR="/share/$SUBDIR"
+# fi
 
-bashio::log.info "Creating output directory: $OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-chmod 755 "$OUTPUT_DIR"
+# bashio::log.info "Creating output directory: $OUTPUT_DIR"
+# mkdir -p "$OUTPUT_DIR"
+# chmod 755 "$OUTPUT_DIR"
 
-# Validate Telegram settings if enabled
-if [ "$TELEGRAM_ENABLED" = "true" ]; then
-    bashio::log.info "Telegram integration enabled"
+# # Validate Telegram settings if enabled
+# if [ "$TELEGRAM_ENABLED" = "true" ]; then
+#     bashio::log.info "Telegram integration enabled"
     
-    if [ -z "$TELEGRAM_TOKEN" ]; then
-        bashio::log.warning "Telegram enabled but bot_token is empty"
-    fi
+#     if [ -z "$TELEGRAM_TOKEN" ]; then
+#         bashio::log.warning "Telegram enabled but bot_token is empty"
+#     fi
     
-    if [ -z "$TELEGRAM_CHAT_ID" ]; then
-        bashio::log.warning "Telegram enabled but chat_id is empty"
-    fi
+#     if [ -z "$TELEGRAM_CHAT_ID" ]; then
+#         bashio::log.warning "Telegram enabled but chat_id is empty"
+#     fi
     
-    if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-        bashio::log.info "Telegram configuration looks valid"
-    fi
-else
-    bashio::log.info "Telegram integration disabled"
-fi
+#     if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+#         bashio::log.info "Telegram configuration looks valid"
+#     fi
+# else
+#     bashio::log.info "Telegram integration disabled"
+# fi
+
+# Configure avahi daemon
+bashio::log.info "Configuring avahi daemon..."
+mkdir -p /var/run/avahi-daemon
+chmod 755 /var/run/avahi-daemon
+
+# Configure dbus daemon
+bashio::log.info "Configuring dbus daemon..."
+mkdir -p /var/run/dbus
+chmod 755 /var/run/dbus
 
 bashio::log.info "Configuration complete"

@@ -69,4 +69,47 @@ profile scanner flags=(attach_disconnected,mediate_deleted) {
   # SANE configuration
   /etc/sane.d/** r,
   /usr/share/sane/** r,
+
+  # Avahi daemon configuration
+  /usr/sbin/avahi-daemon ix,
+  /etc/avahi/** r,
+  /var/run/avahi-daemon/** rw,
+  /var/lib/avahi/** rw,
+
+  # Network discovery and mDNS
+  network netlink raw,
+  network inet dgram,
+  network inet6 dgram,
+
+  # DBus access for avahi
+  /usr/bin/dbus-daemon ix,
+  /var/run/dbus/** rw,
+  /etc/dbus-1/** r,
+
+  # Service dependencies and runtime
+  /etc/services.d/**/dependencies.d/** rw,
+  /run/s6/** rw,
+  /run/s6-rc/** rw,
+
+  # Process and signal management
+  capability setuid,
+  capability setgid,
+  capability sys_admin,
+  capability dac_override,
+
+  # Network broadcast for mDNS
+  network inet dgram,
+  network inet6 dgram,
+  network netlink raw,
+
+  # Unix domain sockets for IPC
+  unix,
+
+  # Service runtime directories
+  /run/avahi-daemon/** rw,
+  /run/dbus/** rw,
+
+  # System runtime
+  /run/systemd/** r,
+  /run/udev/** r,
 }

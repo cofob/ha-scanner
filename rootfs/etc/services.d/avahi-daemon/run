@@ -1,0 +1,14 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start the avahi daemon service
+# ==============================================================================
+
+sleep 5
+
+bashio::log.info "Starting avahi daemon..."
+
+# Ensure avahi configuration directory exists
+mkdir -p /var/run/avahi-daemon
+
+# Start avahi daemon in foreground mode
+exec /usr/sbin/avahi-daemon --no-drop-root --no-chroot

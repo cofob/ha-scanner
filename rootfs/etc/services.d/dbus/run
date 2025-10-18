@@ -1,0 +1,12 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start the dbus service
+# ==============================================================================
+
+bashio::log.info "Starting dbus daemon..."
+
+# Ensure dbus configuration directory exists
+mkdir -p /var/run/dbus
+
+# Start dbus daemon in foreground mode
+exec /usr/bin/dbus-daemon --system --nofork --nopidfile
