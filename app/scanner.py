@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 
 import gi
 gi.require_version('Libinsane', '1.0')

@@ -1,15 +1,12 @@
 """Main application entry point for the scanner addon."""
 
 import logging
-import signal
 import sys
-from pathlib import Path
 
 import uvicorn
 
 from .config import load_config
 from .api import create_app, set_app_config
-from .stdin_server import start_stdin_server
 
 
 def setup_logging():
@@ -36,20 +33,9 @@ def setup_logging():
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-def setup_signal_handlers():
-    """Setup graceful shutdown handlers."""
-    def signal_handler(signum, frame):
-        logging.info(f"Received signal {signum}, shutting down gracefully...")
-        sys.exit(0)
-    
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-
-
 def main():
     """Main application entry point."""
     setup_logging()
-    setup_signal_handlers()
     
     logger = logging.getLogger(__name__)
     logger.info("Starting Scanner Add-on...")
@@ -69,9 +55,6 @@ def main():
         app = create_app()
         set_app_config(config)
         
-        # Start STDIN server for Home Assistant communication
-        stdin_thread = start_stdin_server(config)
-        
         # Log startup info
         logger.info(f"HTTP API will be available at http://0.0.0.0:{config.port}")
         logger.info("STDIN server ready for Home Assistant commands")
@@ -84,7 +67,6 @@ def main():
             log_config=None,  # Use our custom logging
             access_log=False  # Disable access logs to reduce noise
         )
-        
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         sys.exit(1)
