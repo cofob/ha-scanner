@@ -62,6 +62,7 @@ def main():
         # Start HTTP server
         uvicorn.run(
             app,
+            workers=1,
             host="0.0.0.0",
             port=config.port,
             log_config=None,  # Use our custom logging
