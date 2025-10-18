@@ -36,4 +36,3 @@ COPY main.py ./
 
 EXPOSE 8099
 
-CMD [ "/run.sh" ]

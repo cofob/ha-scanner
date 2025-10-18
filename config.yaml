@@ -25,7 +25,7 @@ full_access: false
 audio: false
 host_network: false
 stdin: true
-init: false
+init: true
 options:
   device_id: ""
   output_format: "jpeg"
