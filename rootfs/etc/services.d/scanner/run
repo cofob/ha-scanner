@@ -14,4 +14,4 @@ fi
 bashio::log.info "Starting Scanner Add-on..."
 
 # Execute the run script
-/usr/local/bin/run.sh
+exec /usr/local/bin/run.sh
