@@ -90,7 +90,7 @@ class ScannerBot:
                 devices = self.api.list_devices(Libinsane.DeviceLocations.ANY)
                 if not devices:
                     raise Exception("No scanner devices found")
-                device = self.api.get_device(devices[0]["id"])
+                device = self.api.get_device(devices[0].get_dev_id())
                 logger.info(f"Using first available device: {device.get_name()}")
             logger.info(f"Using device: {device.get_name()}")
             sources = device.get_children()
