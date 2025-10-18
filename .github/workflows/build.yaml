@@ -21,14 +21,16 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     strategy:
       matrix:
         platform:
           - linux/amd64
           - linux/arm64
           - linux/arm/v7
-    
+          - linux/arm/v6
+          - linux/386
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,7 +82,17 @@ jobs:
             linux/arm/v7)
               echo "base=ghcr.io/home-assistant/armv7-base-debian:bookworm" >> $GITHUB_OUTPUT
               echo "arch=armv7" >> $GITHUB_OUTPUT
+              echo "build_arch=armv7" >> $GITHUB_OUTPUT
+              ;;
+            linux/arm/v6)
+              echo "base=ghcr.io/home-assistant/armhf-base-debian:bookworm" >> $GITHUB_OUTPUT
+              echo "arch=armhf" >> $GITHUB_OUTPUT
               echo "build_arch=armhf" >> $GITHUB_OUTPUT
+              ;;
+            linux/386)
+              echo "base=ghcr.io/home-assistant/i386-base-debian:bookworm" >> $GITHUB_OUTPUT
+              echo "arch=i386" >> $GITHUB_OUTPUT
+              echo "build_arch=i386" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -111,7 +123,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -141,5 +153,7 @@ jobs:
             docker buildx imagetools create -t "$TAG" \
               "$TAG-amd64" \
               "$TAG-aarch64" \
-              "$TAG-armv7"
+              "$TAG-armv7" \
+              "$TAG-armhf" \
+              "$TAG-i386"
           done

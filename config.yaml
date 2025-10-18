@@ -4,9 +4,11 @@ slug: "ha_scanner"
 description: "Scan documents using libinsane with Telegram integration"
 url: "https://github.com/cofob/ha-scanner"
 arch:
-  - amd64
   - aarch64
+  - amd64
+  - armhf
   - armv7
+  - i386
 startup: services
 boot: auto
 ports:
