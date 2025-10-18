@@ -90,14 +90,14 @@ class ScannerBot:
                 devices = self.api.list_devices(Libinsane.DeviceLocations.ANY)
                 if not devices:
                     raise Exception("No scanner devices found")
-                device = devices[0]
-                logger.info(f"Using first available device: {device.get_dev_model()}")
-            logger.info(f"Using device: {device.get_dev_model()}")
+                device = self.api.get_device(devices[0]["id"])
+                logger.info(f"Using first available device: {device.get_name()}")
+            logger.info(f"Using device: {device.get_name()}")
             sources = device.get_children()
             if not sources:
                 raise Exception("No scan sources found for this device")
             source = sources[0]
-            logger.info(f"Using source: {source.get_dev_model()}")
+            logger.info(f"Using source: {source.get_name()}")
             session = source.scan_start()
             logger.info("Scanning started...")
             if session.end_of_feed():
@@ -225,7 +225,9 @@ def devices_command(update: Update, context: CallbackContext) -> None:
             return
         device_list = "Available scanner devices:\n\n"
         for device in devices:
-            device_list += f"• {device['name']} (Type: {device['type']})\n"
+            device_list += (
+                f"• {device['name']} (Type: {device['type']}, ID: {device['id']})\n"
+            )
         update.message.reply_text(device_list)
     except Exception as e:
         logger.error(f"Error listing devices: {e}")
