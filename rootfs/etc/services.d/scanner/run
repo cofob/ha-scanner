@@ -6,10 +6,10 @@
 export PYTHONUNBUFFERED=1
 
 # Ensure options exist
-# if ! bashio::fs.file_exists "/data/options.json"; then
-#     bashio::log.error "Options file not found!"
-#     exit 1
-# fi
+if ! bashio::fs.file_exists "/data/options.json"; then
+    bashio::log.error "Options file not found!"
+    exit 1
+fi
 
 sleep 10
 
