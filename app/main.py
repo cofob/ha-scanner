@@ -66,8 +66,8 @@ class ScannerBot:
                 device_info = {
                     "index": i,
                     "id": dev.get_dev_id(),
-                    "name": dev.get_name(),
-                    "type": dev.get_type(),
+                    "name": dev.get_dev_model(),
+                    "type": dev.get_dev_type(),
                 }
                 device_list.append(device_info)
                 logger.info(
@@ -91,13 +91,13 @@ class ScannerBot:
                 if not devices:
                     raise Exception("No scanner devices found")
                 device = devices[0]
-                logger.info(f"Using first available device: {device.get_name()}")
-            logger.info(f"Using device: {device.get_name()}")
+                logger.info(f"Using first available device: {device.get_dev_model()}")
+            logger.info(f"Using device: {device.get_dev_model()}")
             sources = device.get_children()
             if not sources:
                 raise Exception("No scan sources found for this device")
             source = sources[0]
-            logger.info(f"Using source: {source.get_name()}")
+            logger.info(f"Using source: {source.get_dev_model()}")
             session = source.scan_start()
             logger.info("Scanning started...")
             if session.end_of_feed():
