@@ -19,6 +19,7 @@ map:
   - media:rw
   - share:rw
 usb: true
+udev: true
 devices:
   - /dev/bus/usb:/dev/bus/usb:rwm
 full_access: false

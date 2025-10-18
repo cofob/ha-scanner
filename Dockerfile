@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 # Install base packages and dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential make meson ninja-build git pkg-config valac gtk-doc-tools \
-    libsane1 libsane-dev sane-utils sane-airscan \
+    libsane1 libsane-dev sane-utils sane-airscan udev \
     libgirepository1.0-dev gobject-introspection \
     python3 python3-gi python3-pil python3-fastapi python3-uvicorn python3-httpx python3-pydantic \
     ca-certificates curl \
