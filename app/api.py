@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ScanRequest(BaseModel):
     """Request model for scan endpoint."""
+
     device_id: Optional[str] = None
     output_format: Optional[str] = None
     quality: Optional[int] = None
@@ -28,6 +29,7 @@ class ScanRequest(BaseModel):
 
 class ScanResponse(BaseModel):
     """Response model for scan endpoint."""
+
     success: bool
     request_id: str
     saved: List[str]
@@ -37,6 +39,7 @@ class ScanResponse(BaseModel):
 
 class DeviceInfo(BaseModel):
     """Device information model."""
+
     id: str
     name: str
     vendor: str = ""
@@ -45,8 +48,9 @@ class DeviceInfo(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str
-    version: str = "0.1.9"
+    version: str = "0.1.10"
 
 
 # Global config will be injected
@@ -71,7 +75,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Scanner API",
         description="Home Assistant Scanner Add-on API",
-        version="0.1.9"
+        version="0.1.10",
     )
 
     @app.get("/healthz", response_model=HealthResponse)
@@ -89,7 +93,7 @@ def create_app() -> FastAPI:
                     id=device.id,
                     name=device.name,
                     vendor=device.vendor,
-                    model=device.model
+                    model=device.model,
                 )
                 for device in devices
             ]
@@ -98,36 +102,39 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.post("/v1/scan", response_model=ScanResponse)
-    async def scan(
-        request: ScanRequest,
-        config: AppConfig = Depends(get_app_config)
-    ):
+    async def scan(request: ScanRequest, config: AppConfig = Depends(get_app_config)):
         """Trigger a scan operation."""
         request_id = str(uuid.uuid4())[:8]
-        
+
         logger.info(f"[{request_id}] Scan request: {request.dict(exclude_unset=True)}")
-        
+
         try:
             # Convert request to overrides
             overrides = ScanOverrides(**request.dict(exclude_unset=True))
-            
+
             # Perform scan
             saved_files = scan_document(config, overrides)
             saved_paths = [str(path) for path in saved_files]
-            
+
             logger.info(f"[{request_id}] Saved {len(saved_files)} files: {saved_paths}")
-            
+
             # Handle Telegram delivery
             telegram_result = None
             should_send_telegram = (
-                request.send_to_telegram if request.send_to_telegram is not None 
+                request.send_to_telegram
+                if request.send_to_telegram is not None
                 else config.telegram.enabled
             )
-            
+
             if should_send_telegram:
                 if not config.telegram.bot_token or not config.telegram.chat_id:
-                    logger.warning(f"[{request_id}] Telegram enabled but missing bot_token or chat_id")
-                    telegram_result = {"sent": False, "error": "Missing Telegram credentials"}
+                    logger.warning(
+                        f"[{request_id}] Telegram enabled but missing bot_token or chat_id"
+                    )
+                    telegram_result = {
+                        "sent": False,
+                        "error": "Missing Telegram credentials",
+                    }
                 else:
                     caption = request.caption or config.telegram.caption
                     telegram_result = send_to_telegram(
@@ -135,17 +142,17 @@ def create_app() -> FastAPI:
                         config.telegram.bot_token,
                         config.telegram.chat_id,
                         caption,
-                        config.telegram.use_album
+                        config.telegram.use_album,
                     )
                     logger.info(f"[{request_id}] Telegram result: {telegram_result}")
-            
+
             return ScanResponse(
                 success=True,
                 request_id=request_id,
                 saved=saved_paths,
-                telegram=telegram_result
+                telegram=telegram_result,
             )
-            
+
         except DeviceNotFoundError as e:
             logger.error(f"[{request_id}] Device not found: {e}")
             raise HTTPException(status_code=404, detail=str(e))
