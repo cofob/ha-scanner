@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import uvicorn
-from pythonjsonlogger import jsonlogger
 
 from .config import load_config
 from .api import create_app, set_app_config
@@ -16,7 +15,7 @@ from .stdin_server import start_stdin_server
 def setup_logging():
     """Setup JSON logging for Home Assistant."""
     # Create JSON formatter
-    formatter = jsonlogger.JsonFormatter(
+    formatter = logging.Formatter(
         '%(asctime)s %(name)s %(levelname)s %(message)s'
     )
     
