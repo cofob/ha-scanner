@@ -9,10 +9,6 @@ bashio::log.info "Configuring Scanner Add-on..."
 TELEGRAM_TOKEN=$(bashio::config "telegram.bot_token")
 TELEGRAM_CHAT_ID=$(bashio::config "telegram.chat_id")
 
-bashio::log.info "Creating output directory: $OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-chmod 755 "$OUTPUT_DIR"
-
 if [ -z "$TELEGRAM_TOKEN" ]; then
     bashio::log.warning "Telegram bot_token is empty"
 fi
