@@ -171,11 +171,10 @@ def is_authorized(update: Update) -> bool:
     return scanner_bot.is_chat_allowed(chat_id)
 
 
-# <<< FIX: Replace ContextTypes.DEFAULT_TYPE with CallbackContext
-async def start_command(update: Update, context: CallbackContext) -> None:
+def start_command(update: Update, context: CallbackContext) -> None:
     """Handle /start command."""
     if not is_authorized(update):
-        await update.message.reply_text(
+        update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
@@ -187,13 +186,13 @@ async def start_command(update: Update, context: CallbackContext) -> None:
         "/help - Show this help message\n\n"
         "Simply place a document in your scanner and use /scan to start scanning."
     )
-    await update.message.reply_text(welcome_message)
+    update.message.reply_text(welcome_message)
 
 
-async def help_command(update: Update, context: CallbackContext) -> None:
+def help_command(update: Update, context: CallbackContext) -> None:
     """Handle /help command."""
     if not is_authorized(update):
-        await update.message.reply_text(
+        update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
@@ -207,50 +206,50 @@ async def help_command(update: Update, context: CallbackContext) -> None:
         "2. Use the /scan command\n"
         "3. The bot will scan and send the document back to you"
     )
-    await update.message.reply_text(help_text)
+    update.message.reply_text(help_text)
 
 
-async def devices_command(update: Update, context: CallbackContext) -> None:
+def devices_command(update: Update, context: CallbackContext) -> None:
     """Handle /devices command to list available scanners."""
     if not is_authorized(update):
-        await update.message.reply_text(
+        update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
     try:
         devices = scanner_bot.list_scanner_devices()
         if not devices:
-            await update.message.reply_text(
+            update.message.reply_text(
                 "No scanner devices found. Please check your scanner connection."
             )
             return
         device_list = "Available scanner devices:\n\n"
         for device in devices:
             device_list += f"• {device['name']} (Type: {device['type']})\n"
-        await update.message.reply_text(device_list)
+        update.message.reply_text(device_list)
     except Exception as e:
         logger.error(f"Error listing devices: {e}")
-        await update.message.reply_text(f"Error listing devices: {str(e)}")
+        update.message.reply_text(f"Error listing devices: {str(e)}")
 
 
-async def scan_command(update: Update, context: CallbackContext) -> None:
+def scan_command(update: Update, context: CallbackContext) -> None:
     """Handle /scan command to scan a document."""
     if not is_authorized(update):
-        await update.message.reply_text(
+        update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
     try:
-        await update.message.reply_text("Starting scan process... Please wait.")
+        update.message.reply_text("Starting scan process... Please wait.")
         scanned_files = scanner_bot.scan_document()
         if not scanned_files:
-            await update.message.reply_text(
+            update.message.reply_text(
                 "No pages were scanned. Please check if a document is loaded in the scanner."
             )
             return
         if len(scanned_files) == 1:
             with open(scanned_files[0], "rb") as photo:
-                await update.message.reply_photo(
+                update.message.reply_photo(
                     photo=photo, caption="Here's your scanned document!"
                 )
         else:
@@ -263,10 +262,10 @@ async def scan_command(update: Update, context: CallbackContext) -> None:
                         caption=f"Scanned document - Page {i + 1}" if i == 0 else None,
                     )
                 )
-            await context.bot.send_media_group(
+            context.bot.send_media_group(
                 chat_id=update.effective_chat.id, media=media_group
             )
-        await update.message.reply_text(
+        update.message.reply_text(
             f"Scan complete! Sent {len(scanned_files)} page(s)."
         )
         for file_path in scanned_files:
@@ -276,16 +275,16 @@ async def scan_command(update: Update, context: CallbackContext) -> None:
                 logger.warning(f"Failed to delete temporary file {file_path}: {e}")
     except Exception as e:
         logger.error(f"Error during scan: {e}")
-        await update.message.reply_text(
+        update.message.reply_text(
             f"Error during scanning: {str(e)}\n\nPlease check:\n• Scanner is connected and powered on\n• Document is properly loaded\n• Scanner drivers are installed"
         )
 
 
-async def handle_text(update: Update, context: CallbackContext) -> None:
+def handle_text(update: Update, context: CallbackContext) -> None:
     """Handle text messages."""
     if not is_authorized(update):
         return
-    await update.message.reply_text(
+    update.message.reply_text(
         "Please use commands to interact with the bot. Type /help for available commands."
     )
 
@@ -308,7 +307,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("devices", devices_command))
     dispatcher.add_handler(CommandHandler("scan", scan_command))
-    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    dispatcher.add_handler(MessageHandler(filters.Filters.text, handle_text))
     logger.info("Starting Telegram bot...")
     updater.start_polling()
     updater.idle()
