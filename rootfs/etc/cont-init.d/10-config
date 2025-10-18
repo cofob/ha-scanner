@@ -6,16 +6,44 @@
 bashio::log.info "Configuring Scanner Add-on..."
 
 # Get configuration values
-TELEGRAM_TOKEN=$(bashio::config "telegram.bot_token")
+DEVICE_ID=$(bashio::config "device_id")
+OUTPUT_FORMAT=$(bashio::config "output_format")
+QUALITY=$(bashio::config "quality")
+FILENAME_PATTERN=$(bashio::config "filename_pattern")
+SAVE_TO=$(bashio::config "save_to")
+SUBDIR=$(bashio::config "subdir")
+RESOLUTION=$(bashio::config "resolution")
+TELEGRAM_ENABLED=$(bashio::config "telegram.enabled")
+TELEGRAM_BOT_TOKEN=$(bashio::config "telegram.bot_token")
 TELEGRAM_CHAT_ID=$(bashio::config "telegram.chat_id")
+TELEGRAM_CAPTION=$(bashio::config "telegram.caption")
+TELEGRAM_USE_ALBUM=$(bashio::config "telegram.use_album")
 
-if [ -z "$TELEGRAM_TOKEN" ]; then
-    bashio::log.warning "Telegram bot_token is empty"
-fi
+# Create data directory if it doesn't exist
+mkdir -p /data
 
-if [ -z "$TELEGRAM_CHAT_ID" ]; then
-    bashio::log.warning "Telegram chat_id is empty"
-fi
+# Create config.json file
+bashio::log.info "Creating config.json file..."
+cat > /data/options.json <<EOF
+{
+  "device_id": "$DEVICE_ID",
+  "output_format": "$OUTPUT_FORMAT",
+  "quality": $QUALITY,
+  "filename_pattern": "$FILENAME_PATTERN",
+  "save_to": "$SAVE_TO",
+  "subdir": "$SUBDIR",
+  "resolution": $RESOLUTION,
+  "telegram": {
+    "enabled": $TELEGRAM_ENABLED,
+    "bot_token": "$TELEGRAM_BOT_TOKEN",
+    "chat_id": "$TELEGRAM_CHAT_ID",
+    "caption": "$TELEGRAM_CAPTION",
+    "use_album": $TELEGRAM_USE_ALBUM
+  }
+}
+EOF
+
+bashio::log.info "Config.json created successfully"
 
 # Configure avahi daemon
 bashio::log.info "Configuring avahi daemon..."
