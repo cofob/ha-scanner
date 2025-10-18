@@ -32,7 +32,6 @@ RUN chmod a+x /etc/cont-init.d/10-config \
     cp /usr/local/bin/run.sh /run.sh
 
 COPY app ./app
-COPY main.py ./
 
 EXPOSE 46201
 
