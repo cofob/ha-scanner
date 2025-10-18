@@ -23,6 +23,7 @@ full_access: false
 audio: false
 host_network: false
 stdin: true
+init: false
 options:
   device_id: ""
   output_format: "jpeg"
@@ -51,4 +52,3 @@ schema:
     chat_id: str?
     caption: str?
     use_album: bool
-image: "ghcr.io/cofob/ha-scanner"
