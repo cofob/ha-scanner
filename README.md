@@ -5,7 +5,7 @@ Scan documents using your USB or network scanner directly from Home Assistant au
 ## Features
 
 - **Multiple Scanner Support**: Works with USB and network scanners via libinsane/SANE
-- **Automation Integration**: Trigger scans via `hassio.addon_stdin` service calls
+- **Automation Integration**: Trigger scans via `hassio.addon_stdin` service calls (continuous STDIN listener)
 - **Telegram Integration**: Automatically send scanned documents to Telegram
 - **Flexible Output**: Save to Home Assistant media or share folders
 - **Configurable Quality**: JPEG/PNG output with quality settings
@@ -54,5 +54,17 @@ automation:
           input: |
             {"command": "scan", "overrides": {"send_to_telegram": true}}
 ```
+
+### STDIN Responses
+
+Each command sent via `hassio.addon_stdin` now receives a JSON response on the add-on logs/stdout.
+Example success response:
+
+```json
+{"success": true, "command": "scan", "request_id": "5f92c3d1", "saved": ["/media/scanner/scan_2025-10-18_08-31-02_0.jpeg"]}
+```
+
+If an error occurs, a structured payload is returned with `success: false` along with `error` and `detail` fields.
+The STDIN listener stays active for the lifetime of the add-on and safely ignores EOF conditions, preventing the HTTP server from shutting down unexpectedly.
 
 For detailed documentation, see the **Documentation** tab.
