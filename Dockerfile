@@ -34,5 +34,5 @@ RUN chmod a+x /etc/cont-init.d/10-config \
 COPY app ./app
 COPY main.py ./
 
-EXPOSE 8099
+EXPOSE 46201
 

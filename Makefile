@@ -42,7 +42,7 @@ docker-build:  ## Build the Home Assistant addon Docker image
 
 docker-run:  ## Run the addon Docker image locally (for testing)
 	docker run --rm -it \
-		-p 8099:8099 \
+		-p 46201:46201 \
 		-v $(PWD)/test-data:/data \
 		-v $(PWD)/test-media:/media \
 		--privileged \

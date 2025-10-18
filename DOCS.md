@@ -38,7 +38,7 @@
 ### Finding Your Scanner ID
 
 1. Start the add-on and check the logs for detected devices
-2. Or use the HTTP API: `GET http://homeassistant.local:8099/v1/devices`
+2. Or use the HTTP API: `GET http://homeassistant.local:46201/v1/devices`
 3. Device IDs typically look like:
    - USB: `epson2:libusb:001:005`
    - Network: `airscan:escl:Canon TR8500:http://192.168.1.100:80/eSCL/`
@@ -111,12 +111,12 @@ automation:
 
 ### Method 2: HTTP API
 
-The add-on also exposes an HTTP API on port 8099 for manual or advanced use cases.
+The add-on also exposes an HTTP API on port 46201 for manual or advanced use cases.
 
 ```yaml
 rest_command:
   scanner_scan:
-    url: "http://127.0.0.1:8099/v1/scan"
+    url: "http://127.0.0.1:46201/v1/scan"
     method: POST
     headers:
       Content-Type: "application/json"
