@@ -87,8 +87,13 @@ profile scanner flags=(attach_disconnected,mediate_deleted) {
   /etc/dbus-1/** r,
 
   # Service dependencies and runtime
+  /etc/services.d/ rw,
+  /etc/services.d/**/ rw,
+  /etc/services.d/**/dependencies.d/ rw,
   /etc/services.d/**/dependencies.d/** rw,
+  /run/s6/ rw,
   /run/s6/** rw,
+  /run/s6-rc/ rw,
   /run/s6-rc/** rw,
 
   # Process and signal management
@@ -96,6 +101,11 @@ profile scanner flags=(attach_disconnected,mediate_deleted) {
   capability setgid,
   capability sys_admin,
   capability dac_override,
+  capability dac_read_search,
+  capability chown,
+  capability fowner,
+  capability fsetid,
+  capability mknod,
 
   # Network broadcast for mDNS
   network inet dgram,
@@ -106,10 +116,15 @@ profile scanner flags=(attach_disconnected,mediate_deleted) {
   unix,
 
   # Service runtime directories
+  /run/avahi-daemon/ rw,
   /run/avahi-daemon/** rw,
+  /run/dbus/ rw,
   /run/dbus/** rw,
-
+  
   # System runtime
   /run/systemd/** r,
   /run/udev/** r,
+  
+  # Runtime directory creation
+  /run/ rw,
 }
