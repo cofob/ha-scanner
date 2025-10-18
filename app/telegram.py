@@ -1,6 +1,7 @@
 """Telegram integration for sending scanned documents."""
 
 import logging
+import json
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import asyncio
@@ -108,7 +109,7 @@ async def send_media_group(
     
     data = {
         'chat_id': chat_id,
-        'media': str(media).replace(\"'\", '\"')  # Convert to JSON string
+        'media': json.dumps(media)
     }
     
     async with httpx.AsyncClient(timeout=60.0) as client:
