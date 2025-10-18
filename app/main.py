@@ -9,17 +9,12 @@ from pathlib import Path
 import gi
 from telegram import Update, InputMediaPhoto
 from telegram.ext import (
-    Updater,  # <<< FIX: Use Updater instead of Application for v13.x
+    Updater,
     CommandHandler,
-    ContextTypes,
+    CallbackContext,  # <<< FIX: Import CallbackContext for v13.x type hinting
     MessageHandler,
     filters,
 )
-
-# Import configuration
-# Assuming you have a config file structure like app/config.py
-# If not, you can replace this with direct variable assignments.
-# from app.config import load_config
 
 
 # A simple placeholder if you don't have the config file setup
@@ -45,9 +40,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load configuration
-# config = load_config() # Uncomment this if you have a config loader
-
 
 class ScannerBot:
     """Telegram bot for document scanning using libinsane."""
@@ -57,7 +49,6 @@ class ScannerBot:
         self.token = token
         self.allowed_chat_ids = allowed_chat_ids or []
         self.api = None
-        # <<< FIX: Removed self.application, as it's handled in main()
 
     def initialize_libinsane(self):
         """Initialize libinsane API."""
@@ -72,13 +63,11 @@ class ScannerBot:
         """List available scanner devices."""
         if not self.api:
             self.initialize_libinsane()
-
         try:
             devices = self.api.list_devices(Libinsane.DeviceLocations.ANY)
             if not devices:
                 logger.warning("No scanner devices found")
                 return []
-
             logger.info(f"Found {len(devices)} scanner device(s)")
             device_list = []
             for i, dev in enumerate(devices):
@@ -92,7 +81,6 @@ class ScannerBot:
                 logger.info(
                     f"Device [{i}]: ID='{device_info['id']}', Name='{device_info['name']}', Type='{device_info['type']}'"
                 )
-
             return device_list
         except Exception as e:
             logger.error(f"Error listing devices: {e}")
@@ -102,10 +90,8 @@ class ScannerBot:
         """Scan document and return list of saved image paths."""
         if not self.api:
             self.initialize_libinsane()
-
-        session = None  # <<< FIX: Initialize session to None
+        session = None
         try:
-            # Get device
             if device_id:
                 device = self.api.get_device(device_id)
             else:
@@ -114,65 +100,45 @@ class ScannerBot:
                     raise Exception("No scanner devices found")
                 device = devices[0]
                 logger.info(f"Using first available device: {device.get_name()}")
-
             logger.info(f"Using device: {device.get_name()}")
-
-            # Get first available scan source
             sources = device.get_children()
             if not sources:
                 raise Exception("No scan sources found for this device")
-
             source = sources[0]
             logger.info(f"Using source: {source.get_name()}")
-
-            # Start scanning
             session = source.scan_start()
             logger.info("Scanning started...")
-
             if session.end_of_feed():
                 raise Exception("No document found in the scanner")
-
-            # Create temporary directory for scans
             temp_dir = Path(tempfile.mkdtemp())
             saved_files = []
             page_num = 0
-
             while not session.end_of_feed():
                 scan_params = session.get_scan_parameters()
                 img_data = b""
-
-                # Read image data
                 while True:
                     try:
-                        # Use get_data() which returns bytes directly
                         chunk_data = session.read_bytes(128 * 1024).get_data()
                         if not chunk_data:
                             break
                         img_data += chunk_data
                     except Exception:
-                        break  # End of page
-
+                        break
                 if not img_data:
                     continue
-
-                # Process image based on format
                 width = scan_params.get_width()
                 if width == 0:
                     logger.warning(
                         "Scan returned image with zero width. Skipping page."
                     )
                     continue
-
-                # More robust height calculation
-                bytes_per_pixel = 3  # Assuming 24-bit RGB
+                bytes_per_pixel = 3
                 height = int(len(img_data) / (width * bytes_per_pixel))
-
                 if height == 0:
                     logger.warning(
                         "Scan returned image with zero height. Skipping page."
                     )
                     continue
-
                 if scan_params.get_format() == Libinsane.ImgFormat.RAW_RGB_24:
                     image = Image.frombytes("RGB", (width, height), img_data)
                 else:
@@ -180,18 +146,13 @@ class ScannerBot:
                         f"Unsupported image format: {scan_params.get_format()}"
                     )
                     continue
-
-                # Save as PNG
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 output_file = temp_dir / f"scan_{timestamp}_page{page_num}.png"
                 image.save(output_file, format="PNG")
                 saved_files.append(output_file)
                 logger.info(f"Saved page {page_num} to '{output_file}'")
-
                 page_num += 1
-
             return saved_files
-
         except Exception as e:
             logger.error(f"Error during scanning: {e}")
             raise
@@ -202,11 +163,10 @@ class ScannerBot:
     def is_chat_allowed(self, chat_id: str) -> bool:
         """Check if a chat ID is allowed to use the bot."""
         if not self.allowed_chat_ids:
-            return True  # Allow all if no restrictions set
+            return True
         return str(chat_id) in self.allowed_chat_ids
 
 
-# Global bot instance
 scanner_bot = ScannerBot(
     config.telegram.bot_token,
     [config.telegram.chat_id] if config.telegram.chat_id else [],
@@ -219,14 +179,14 @@ def is_authorized(update: Update) -> bool:
     return scanner_bot.is_chat_allowed(chat_id)
 
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+# <<< FIX: Replace ContextTypes.DEFAULT_TYPE with CallbackContext
+async def start_command(update: Update, context: CallbackContext) -> None:
     """Handle /start command."""
     if not is_authorized(update):
         await update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
-
     welcome_message = (
         "Welcome to the Document Scanner Bot! 📄\n\n"
         "Available commands:\n"
@@ -238,14 +198,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(welcome_message)
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_command(update: Update, context: CallbackContext) -> None:
     """Handle /help command."""
     if not is_authorized(update):
         await update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
-
     help_text = (
         "Document Scanner Bot Help:\n\n"
         "• /scan - Scan a document from the connected scanner\n"
@@ -259,14 +218,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(help_text)
 
 
-async def devices_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def devices_command(update: Update, context: CallbackContext) -> None:
     """Handle /devices command to list available scanners."""
     if not is_authorized(update):
         await update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
-
     try:
         devices = scanner_bot.list_scanner_devices()
         if not devices:
@@ -274,50 +232,38 @@ async def devices_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "No scanner devices found. Please check your scanner connection."
             )
             return
-
         device_list = "Available scanner devices:\n\n"
         for device in devices:
             device_list += f"• {device['name']} (Type: {device['type']})\n"
-
         await update.message.reply_text(device_list)
     except Exception as e:
         logger.error(f"Error listing devices: {e}")
         await update.message.reply_text(f"Error listing devices: {str(e)}")
 
 
-async def scan_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def scan_command(update: Update, context: CallbackContext) -> None:
     """Handle /scan command to scan a document."""
     if not is_authorized(update):
         await update.message.reply_text(
             "Sorry, you are not authorized to use this bot."
         )
         return
-
     try:
         await update.message.reply_text("Starting scan process... Please wait.")
-
-        # Scan document
         scanned_files = scanner_bot.scan_document()
-
         if not scanned_files:
             await update.message.reply_text(
                 "No pages were scanned. Please check if a document is loaded in the scanner."
             )
             return
-
-        # Send scanned images
         if len(scanned_files) == 1:
-            # Single page - send as photo
             with open(scanned_files[0], "rb") as photo:
                 await update.message.reply_photo(
                     photo=photo, caption="Here's your scanned document!"
                 )
         else:
-            # Multiple pages - send as media group
             media_group = []
             for i, file_path in enumerate(scanned_files):
-                # We need to open and read the file content into a bytes object
-                # for the media group to work correctly in older versions.
                 file_bytes = file_path.read_bytes()
                 media_group.append(
                     InputMediaPhoto(
@@ -325,24 +271,17 @@ async def scan_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                         caption=f"Scanned document - Page {i + 1}" if i == 0 else None,
                     )
                 )
-
-            # <<< FIX: Use context.bot.send_media_group instead of update.message.reply_media_group
-            # The 'reply_media_group' method does not exist on the Message object.
             await context.bot.send_media_group(
                 chat_id=update.effective_chat.id, media=media_group
             )
-
         await update.message.reply_text(
             f"Scan complete! Sent {len(scanned_files)} page(s)."
         )
-
-        # Cleanup temporary files
         for file_path in scanned_files:
             try:
                 file_path.unlink()
             except Exception as e:
                 logger.warning(f"Failed to delete temporary file {file_path}: {e}")
-
     except Exception as e:
         logger.error(f"Error during scan: {e}")
         await update.message.reply_text(
@@ -350,11 +289,10 @@ async def scan_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_text(update: Update, context: CallbackContext) -> None:
     """Handle text messages."""
     if not is_authorized(update):
-        return  # Ignore messages from unauthorized users
-
+        return
     await update.message.reply_text(
         "Please use commands to interact with the bot. Type /help for available commands."
     )
@@ -370,28 +308,18 @@ def main() -> None:
             "No bot token configured. Please edit the script and set TELEGRAM_BOT_TOKEN."
         )
         return
-
-    # Initialize libinsane
     try:
         scanner_bot.initialize_libinsane()
     except Exception as e:
         logger.error(f"Failed to initialize scanner: {e}")
         return
-
-    # <<< FIX: Create Updater and Dispatcher for v13.x
     updater = Updater(config.telegram.bot_token, use_context=True)
     dispatcher = updater.dispatcher
-
-    # Add handlers
     dispatcher.add_handler(CommandHandler("start", start_command))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("devices", devices_command))
     dispatcher.add_handler(CommandHandler("scan", scan_command))
-
-    # Add text message handler (for non-command messages)
     dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    # <<< FIX: Start the bot using start_polling() and idle() for v13.x
     logger.info("Starting Telegram bot...")
     updater.start_polling()
     updater.idle()
