@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsane1 libsane-dev sane-utils sane-airscan udev \
     libgirepository1.0-dev gobject-introspection \
     python3 python3-gi python3-pil python3-fastapi python3-uvicorn python3-httpx python3-pydantic \
-    ca-certificates curl avahi-daemon dbus libnss-mdns \
+    python3-python-telegram-bot ca-certificates curl avahi-daemon dbus libnss-mdns \
     && rm -rf /var/lib/apt/lists/*
 
 # Build and install libinsane from source
