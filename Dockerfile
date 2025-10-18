@@ -25,10 +25,15 @@ RUN git clone --depth=1 https://gitlab.gnome.org/World/OpenPaperwork/libinsane.g
 WORKDIR /opt/scanner
 
 COPY rootfs/ /
+RUN chmod a+x /etc/cont-init.d/10-config \
+    /etc/services.d/scanner/finish \
+    /etc/services.d/scanner/run \
+    /usr/local/bin/run.sh && \
+    cp /usr/local/bin/run.sh /run.sh
 
 COPY app ./app
 COPY main.py ./
 
 EXPOSE 8099
 
-CMD [ "/usr/local/bin/run.sh" ]
+CMD [ "/run.sh" ]
