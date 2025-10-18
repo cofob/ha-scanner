@@ -5,6 +5,7 @@ import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from .config import load_config
 
 import gi
 from telegram import Update, InputMediaPhoto
@@ -17,16 +18,7 @@ from telegram.ext import (
 )
 
 
-# A simple placeholder if you don't have the config file setup
-class Config:
-    class Telegram:
-        bot_token = "YOUR_BOT_TOKEN_HERE"  # IMPORTANT: Replace with your token
-        chat_id = "YOUR_CHAT_ID_HERE"  # Optional: Replace with your allowed chat ID
-
-    telegram = Telegram()
-
-
-config = Config()
+config = load_config()
 
 
 # Setup GObject introspection for libinsane
@@ -300,10 +292,7 @@ async def handle_text(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     """Run the bot."""
-    if (
-        not config.telegram.bot_token
-        or config.telegram.bot_token == "YOUR_BOT_TOKEN_HERE"
-    ):
+    if not config.telegram.bot_token:
         logger.error(
             "No bot token configured. Please edit the script and set TELEGRAM_BOT_TOKEN."
         )

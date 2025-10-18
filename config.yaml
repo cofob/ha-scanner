@@ -1,5 +1,5 @@
 name: "Libinsane Scanner"
-version: "0.1.25"
+version: "0.1.26"
 slug: "ha_scanner"
 description: "Scan documents using libinsane with Telegram integration"
 url: "https://github.com/cofob/ha-scanner"
