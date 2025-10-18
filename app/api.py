@@ -50,7 +50,7 @@ class HealthResponse(BaseModel):
     """Health check response."""
 
     status: str
-    version: str = "0.1.16"
+    version: str = "0.1.17"
 
 
 # Global config will be injected
@@ -75,7 +75,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Scanner API",
         description="Home Assistant Scanner Add-on API",
-        version="0.1.16",
+        version="0.1.17",
     )
 
     @app.get("/healthz", response_model=HealthResponse)

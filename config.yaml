@@ -1,5 +1,5 @@
 name: "Libinsane Scanner"
-version: "0.1.16"
+version: "0.1.17"
 slug: "ha_scanner"
 description: "Scan documents using libinsane with Telegram integration"
 url: "https://github.com/cofob/ha-scanner"
@@ -11,10 +11,6 @@ arch:
   - i386
 startup: services
 boot: auto
-ports:
-  46201/tcp: 46201
-ports_description:
-  46201/tcp: "HTTP API for manual scan triggers"
 map:
   - media:rw
   - share:rw
@@ -24,8 +20,8 @@ devices:
   - /dev/bus/usb:/dev/bus/usb:rwm
 full_access: false
 audio: false
-host_network: false
-stdin: true
+host_network: true
+stdin: false
 init: false
 options:
   device_id: ""
