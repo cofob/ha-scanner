@@ -30,3 +30,5 @@ COPY app ./app
 COPY main.py ./
 
 EXPOSE 8099
+
+CMD [ "/usr/local/bin/run.sh" ]
