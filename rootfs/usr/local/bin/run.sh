@@ -16,4 +16,4 @@ fi
 
 # Start the Python application
 echo "Starting Scanner Add-on service..."
-exec python3 -m app.main
+python3 -m app.main
