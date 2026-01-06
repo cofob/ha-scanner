@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.36] - 2026-01-07
+
+### Fixed
+- STDIN reader now reopens after EOF to handle Supervisor writes.
+
 ## [0.1.35] - 2026-01-07
 
 ### Fixed

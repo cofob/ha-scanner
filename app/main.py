@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -789,26 +790,28 @@ def handle_stdin_line(line: str) -> None:
 
 
 def stdin_reader() -> None:
-    stream = None
     stdin_path = Path("/proc/1/fd/0")
-    try:
-        if stdin_path.exists():
-            stream = stdin_path.open("r", encoding="utf-8", errors="replace")
-            logger.info("STDIN reader attached to /proc/1/fd/0")
-        else:
-            stream = sys.stdin
-            logger.info("STDIN reader attached to sys.stdin")
-        for line in stream:
-            handle_stdin_line(line)
-    except Exception as exc:
-        logger.warning("STDIN reader error: %s", exc)
-    finally:
-        if stream and stream is not sys.stdin:
-            try:
-                stream.close()
-            except Exception:
-                pass
-        logger.info("STDIN reader stopped (EOF).")
+    while True:
+        stream = None
+        try:
+            if stdin_path.exists():
+                stream = stdin_path.open("r", encoding="utf-8", errors="replace")
+                logger.info("STDIN reader attached to /proc/1/fd/0")
+            else:
+                stream = sys.stdin
+                logger.info("STDIN reader attached to sys.stdin")
+            for line in stream:
+                handle_stdin_line(line)
+            logger.info("STDIN reader stopped (EOF).")
+        except Exception as exc:
+            logger.warning("STDIN reader error: %s", exc)
+        finally:
+            if stream and stream is not sys.stdin:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+        time.sleep(0.5)
 
 
 def main() -> None:
