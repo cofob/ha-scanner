@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.35] - 2026-01-07
+
+### Fixed
+- STDIN reader now attaches to Supervisor-provided stdin under s6.
+
 ## [0.1.34] - 2026-01-07
 
 ### Added
