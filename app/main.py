@@ -85,6 +85,13 @@ ha_client = HomeAssistantClient(os.environ.get("SUPERVISOR_TOKEN"))
 
 
 PDF_QUEUE_WINDOW = timedelta(minutes=30)
+RESOLUTION_OVERRIDE_WINDOW = timedelta(minutes=30)
+RESOLUTION_PRESETS = {
+    "low": 150,
+    "medium": 300,
+    "high": 600,
+    "xhigh": 1200,
+}
 
 
 @dataclass
@@ -160,6 +167,13 @@ class ScannerBot:
                 raise Exception("No scan sources found for this device")
             source = sources[0]
             logger.info(f"Using source: {source.get_name()}")
+            resolution_dpi, _, is_override = get_active_resolution()
+            apply_resolution(source, resolution_dpi)
+            logger.info(
+                "Using scan resolution %s DPI%s",
+                resolution_dpi,
+                " (override)" if is_override else "",
+            )
             session = source.scan_start()
             logger.info("Scanning started...")
             if session.end_of_feed():
@@ -230,6 +244,9 @@ scan_lock = threading.Lock()
 telegram_sender = Bot(config.telegram.bot_token) if config.telegram.bot_token else None
 pdf_queue: list[QueuedImage] = []
 pdf_queue_lock = threading.Lock()
+resolution_override_lock = threading.Lock()
+resolution_override_dpi: Optional[int] = None
+resolution_override_expires_at: Optional[datetime] = None
 
 
 def log_ha_event(message: str, level: str = "info") -> None:
@@ -251,6 +268,60 @@ def get_output_dir() -> Path:
     base = "/media" if config.save_to == "media" else "/share"
     subdir = config.subdir.strip().strip("/")
     return Path(base) / subdir
+
+
+def resolve_resolution_level(level: str) -> Optional[int]:
+    if not level:
+        return None
+    return RESOLUTION_PRESETS.get(level.strip().lower())
+
+
+def set_resolution_override(dpi: int, source: str) -> datetime:
+    expires_at = datetime.now() + RESOLUTION_OVERRIDE_WINDOW
+    with resolution_override_lock:
+        global resolution_override_dpi
+        global resolution_override_expires_at
+        resolution_override_dpi = dpi
+        resolution_override_expires_at = expires_at
+    log_ha_event(
+        f"Resolution override set to {dpi} DPI by {source} (expires {expires_at.isoformat(timespec='seconds')})",
+        level="info",
+    )
+    if ha_client.enabled:
+        ha_client.fire_event(
+            "scanner_resolution_override",
+            {
+                "dpi": dpi,
+                "expires_at": expires_at.isoformat(timespec="seconds"),
+                "source": source,
+            },
+        )
+    return expires_at
+
+
+def get_active_resolution() -> tuple[int, Optional[datetime], bool]:
+    global resolution_override_dpi
+    global resolution_override_expires_at
+    now = datetime.now()
+    with resolution_override_lock:
+        if resolution_override_dpi and resolution_override_expires_at:
+            if resolution_override_expires_at > now:
+                return resolution_override_dpi, resolution_override_expires_at, True
+            resolution_override_dpi = None
+            resolution_override_expires_at = None
+    return config.resolution, None, False
+
+
+def apply_resolution(source, dpi: int) -> None:
+    option_names = ("resolution", "x-resolution", "y-resolution", "scan-resolution")
+    for option in option_names:
+        try:
+            source.set_option(option, dpi)
+            logger.info("Set scan resolution to %s DPI via %s", dpi, option)
+            return
+        except Exception:
+            continue
+    logger.warning("Unable to set scan resolution to %s DPI", dpi)
 
 
 def queue_scanned_files(
@@ -397,6 +468,7 @@ def start_command(update: Update, context: CallbackContext) -> None:
         "/devices - List available scanner devices\n"
         "/pdf - Combine recent scans into a single PDF\n"
         "/delete - Reply to a scan to delete it and remove from the PDF queue\n"
+        "/res <low|medium|high|xhigh> - Set DPI for 30 minutes\n"
         "/help - Show this help message\n\n"
         "Simply place a document in your scanner and use /scan to start scanning."
     )
@@ -416,6 +488,7 @@ def help_command(update: Update, context: CallbackContext) -> None:
         "• /devices - List available scanner devices\n"
         "• /pdf - Combine scans from the last 30 minutes into a PDF\n"
         "• /delete - Reply to a scan to delete it and remove from the PDF queue\n"
+        "• /res <low|medium|high|xhigh> - Set DPI for 30 minutes\n"
         "• /help - Show this help message\n\n"
         "To scan a document:\n"
         "1. Place your document in the scanner\n"
@@ -448,6 +521,38 @@ def devices_command(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         logger.error(f"Error listing devices: {e}")
         update.message.reply_text(f"Error listing devices: {str(e)}")
+
+
+def res_command(update: Update, context: CallbackContext) -> None:
+    """Handle /res command to set temporary scan resolution."""
+    if not is_authorized(update):
+        update.message.reply_text(
+            "Sorry, you are not authorized to use this bot."
+        )
+        return
+    if not context.args:
+        current_dpi, expires_at, is_override = get_active_resolution()
+        if is_override and expires_at:
+            update.message.reply_text(
+                f"Current DPI override: {current_dpi} (expires {expires_at.strftime('%H:%M')})."
+            )
+        else:
+            update.message.reply_text(
+                f"Current DPI: {current_dpi}. Use /res <low|medium|high|xhigh> to set for 30 minutes."
+            )
+        return
+    level = context.args[0].lower()
+    dpi = resolve_resolution_level(level)
+    if not dpi:
+        update.message.reply_text(
+            "Invalid resolution. Use /res <low|medium|high|xhigh>."
+        )
+        return
+    username = update.effective_user.username or update.effective_user.full_name or "unknown"
+    expires_at = set_resolution_override(dpi, f"telegram:{username}")
+    update.message.reply_text(
+        f"Resolution set to {dpi} DPI for 30 minutes (expires {expires_at.strftime('%H:%M')})."
+    )
 
 
 def scan_command(update: Update, context: CallbackContext) -> None:
@@ -637,6 +742,28 @@ def handle_stdin_pdf(command: dict) -> None:
         ha_client.fire_event("scanner_pdf_failed", {"error": str(exc)})
 
 
+def handle_stdin_resolution(command: dict) -> None:
+    level = command.get("level")
+    dpi_value = command.get("dpi")
+    dpi = resolve_resolution_level(level) if level else None
+    if dpi is None and dpi_value is not None:
+        try:
+            dpi = int(dpi_value)
+        except (TypeError, ValueError):
+            dpi = None
+    if not dpi:
+        log_ha_event(
+            f"STDIN resolution override failed: {command}",
+            level="warning",
+        )
+        return
+    expires_at = set_resolution_override(dpi, "stdin")
+    log_ha_event(
+        f"STDIN resolution set to {dpi} DPI (expires {expires_at.isoformat(timespec='seconds')})",
+        level="info",
+    )
+
+
 def handle_stdin_line(line: str) -> None:
     line = line.strip()
     if not line:
@@ -653,6 +780,9 @@ def handle_stdin_line(line: str) -> None:
         return
     if command == "pdf":
         handle_stdin_pdf(payload)
+        return
+    if command in ("resolution", "res"):
+        handle_stdin_resolution(payload)
         return
     logger.warning("Unknown STDIN command: %s", payload)
     log_ha_event(f"Unknown STDIN command: {payload}", level="warning")
@@ -687,6 +817,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("devices", devices_command))
     dispatcher.add_handler(CommandHandler("scan", scan_command))
+    dispatcher.add_handler(CommandHandler("res", res_command))
     dispatcher.add_handler(CommandHandler("pdf", pdf_command))
     dispatcher.add_handler(CommandHandler("delete", delete_command))
     dispatcher.add_handler(MessageHandler(filters.Filters.text, handle_text))

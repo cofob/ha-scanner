@@ -19,6 +19,7 @@ class AppConfig(BaseModel):
 
     save_to: str = "media"
     subdir: str = "scanner"
+    resolution: int = 300
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
 
 

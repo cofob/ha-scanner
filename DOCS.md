@@ -8,6 +8,7 @@ This add-on provides Telegram and Home Assistant automation support for scanning
 - Telegram bot commands for scanning, device listing, PDF creation, and cleanup.
 - Home Assistant automation support via STDIN commands.
 - Outputs saved to `/media/<subdir>` or `/share/<subdir>` based on config.
+- Temporary DPI overrides via Telegram or STDIN commands.
 
 ## Output and Storage
 
@@ -29,6 +30,9 @@ This add-on provides Telegram and Home Assistant automation support for scanning
   - Scans a document from the connected scanner.
   - Sends scanned pages back as photos (single or album).
   - Adds the scanned pages to the in-memory PDF queue.
+- `/res <low|medium|high|xhigh>`
+  - Temporarily sets scan DPI for the next 30 minutes.
+  - Presets: low=150, medium=300, high=600, xhigh=1200.
 - `/pdf`
   - Combines queued scans from the last 30 minutes into a single PDF.
   - Sends the PDF to the chat and saves it to the output folder.
@@ -72,12 +76,26 @@ The add-on accepts JSON commands via STDIN.
 - Saves the PDF to the output folder.
 - Clears the queued items used for the PDF.
 
+### Resolution Override
+
+```json
+{"command": "resolution", "level": "high"}
+```
+
+```json
+{"command": "resolution", "dpi": 600}
+```
+
+- Temporarily sets scan DPI for the next 30 minutes.
+- Preset levels match the Telegram `/res` command.
+
 ## Configuration
 
 - `telegram.bot_token`: Telegram bot token.
 - `telegram.chat_id`: Authorized chat ID for messaging.
 - `save_to`: `media` or `share` to control output base.
 - `subdir`: Output subdirectory under the base path.
+- `resolution`: Default scan DPI when no override is active.
 
 ## Notes and Limitations
 

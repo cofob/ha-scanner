@@ -2,6 +2,15 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.34] - 2026-01-07
+
+### Added
+- Telegram `/res` command for temporary DPI overrides.
+- STDIN `resolution` command for automation-driven DPI overrides.
+
+### Changed
+- Scan resolution now applies default DPI from config unless overridden.
+
 ## [0.1.33] - 2026-01-07
 
 ### Fixed
