@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Telegram bot for scanning documents using libinsane."""
 
+import json
 import logging
-import tempfile
+import os
+import sys
+import threading
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 from .config import load_config
 
 import gi
-from telegram import Update, InputMediaPhoto
+import httpx
+from telegram import Update, InputMediaPhoto, Bot
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -31,6 +36,51 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
+HA_BASE_URL = "http://supervisor/core/api"
+
+
+class HomeAssistantClient:
+    """Small helper for Home Assistant Core API calls via Supervisor proxy."""
+
+    def __init__(self, token: Optional[str]) -> None:
+        self._enabled = bool(token)
+        self._client = None
+        if self._enabled:
+            self._client = httpx.Client(
+                base_url=HA_BASE_URL,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                timeout=10.0,
+            )
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    def _post(self, path: str, payload: dict) -> None:
+        if not self._client:
+            return
+        try:
+            response = self._client.post(path, json=payload)
+            response.raise_for_status()
+        except Exception as exc:
+            logger.warning("Home Assistant API call failed (%s): %s", path, exc)
+
+    def call_service(self, domain: str, service: str, data: Optional[dict] = None) -> None:
+        self._post(f"/api/services/{domain}/{service}", data or {})
+
+    def fire_event(self, event_type: str, event_data: Optional[dict] = None) -> None:
+        self._post(f"/api/events/{event_type}", event_data or {})
+
+    def system_log(self, message: str, level: str = "info") -> None:
+        self.call_service("system_log", "write", {"message": message, "level": level})
+
+
+ha_client = HomeAssistantClient(os.environ.get("SUPERVISOR_TOKEN"))
 
 
 class ScannerBot:
@@ -102,7 +152,8 @@ class ScannerBot:
             logger.info("Scanning started...")
             if session.end_of_feed():
                 raise Exception("No document found in the scanner")
-            temp_dir = Path(tempfile.mkdtemp())
+            output_dir = get_output_dir()
+            output_dir.mkdir(parents=True, exist_ok=True)
             saved_files = []
             page_num = 0
             while not session.end_of_feed():
@@ -138,8 +189,8 @@ class ScannerBot:
                         f"Unsupported image format: {scan_params.get_format()}"
                     )
                     continue
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_file = temp_dir / f"scan_{timestamp}_page{page_num}.png"
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                output_file = output_dir / f"scan_{timestamp}_page{page_num}.png"
                 image.save(output_file, format="PNG")
                 saved_files.append(output_file)
                 logger.info(f"Saved page {page_num} to '{output_file}'")
@@ -163,6 +214,55 @@ scanner_bot = ScannerBot(
     config.telegram.bot_token,
     [config.telegram.chat_id] if config.telegram.chat_id else [],
 )
+scan_lock = threading.Lock()
+telegram_sender = Bot(config.telegram.bot_token) if config.telegram.bot_token else None
+
+
+def log_ha_event(message: str, level: str = "info") -> None:
+    """Write a message into Home Assistant's system log when available."""
+    if ha_client.enabled:
+        ha_client.system_log(message, level=level)
+
+
+def parse_chat_id(chat_id: str) -> Optional[int]:
+    if not chat_id:
+        return None
+    try:
+        return int(chat_id)
+    except ValueError:
+        return None
+
+
+def get_output_dir() -> Path:
+    base = "/media" if config.save_to == "media" else "/share"
+    subdir = config.subdir.strip().strip("/")
+    return Path(base) / subdir
+
+
+def send_scanned_files(
+    bot: Bot, chat_id: int, scanned_files: list[Path], caption_prefix: str
+) -> None:
+    if not scanned_files:
+        return
+    if len(scanned_files) == 1:
+        with open(scanned_files[0], "rb") as photo:
+            bot.send_photo(photo=photo, chat_id=chat_id, caption=caption_prefix)
+        return
+    media_group = []
+    for i, file_path in enumerate(scanned_files):
+        file_bytes = file_path.read_bytes()
+        media_group.append(
+            InputMediaPhoto(
+                media=file_bytes,
+                caption=f"{caption_prefix} - Page {i + 1}" if i == 0 else None,
+            )
+        )
+    bot.send_media_group(chat_id=chat_id, media=media_group)
+
+
+def perform_scan(device_id: Optional[str] = None) -> list[Path]:
+    with scan_lock:
+        return scanner_bot.scan_document(device_id=device_id)
 
 
 def is_authorized(update: Update) -> bool:
@@ -241,42 +341,39 @@ def scan_command(update: Update, context: CallbackContext) -> None:
             "Sorry, you are not authorized to use this bot."
         )
         return
+    username = update.effective_user.username or update.effective_user.full_name or "unknown"
+    chat_id = update.effective_chat.id
+    log_ha_event(
+        f"Telegram scan requested by {username} (chat_id={chat_id})",
+        level="info",
+    )
     try:
         update.message.reply_text("Starting scan process... Please wait.")
-        scanned_files = scanner_bot.scan_document()
+        scanned_files = perform_scan()
         if not scanned_files:
             update.message.reply_text(
                 "No pages were scanned. Please check if a document is loaded in the scanner."
             )
             return
-        if len(scanned_files) == 1:
-            with open(scanned_files[0], "rb") as photo:
-                update.message.reply_photo(
-                    photo=photo, caption="Here's your scanned document!"
-                )
-        else:
-            media_group = []
-            for i, file_path in enumerate(scanned_files):
-                file_bytes = file_path.read_bytes()
-                media_group.append(
-                    InputMediaPhoto(
-                        media=file_bytes,
-                        caption=f"Scanned document - Page {i + 1}" if i == 0 else None,
-                    )
-                )
-            context.bot.send_media_group(
-                chat_id=update.effective_chat.id, media=media_group
-            )
+        send_scanned_files(
+            context.bot,
+            chat_id,
+            scanned_files,
+            "Here's your scanned document!",
+        )
         update.message.reply_text(
             f"Scan complete! Sent {len(scanned_files)} page(s)."
         )
-        for file_path in scanned_files:
-            try:
-                file_path.unlink()
-            except Exception as e:
-                logger.warning(f"Failed to delete temporary file {file_path}: {e}")
+        log_ha_event(
+            f"Telegram scan completed for {username} (chat_id={chat_id}), pages={len(scanned_files)}",
+            level="info",
+        )
     except Exception as e:
         logger.error(f"Error during scan: {e}")
+        log_ha_event(
+            f"Telegram scan failed for {username} (chat_id={chat_id}): {e}",
+            level="error",
+        )
         update.message.reply_text(
             f"Error during scanning: {str(e)}\n\nPlease check:\n• Scanner is connected and powered on\n• Document is properly loaded\n• Scanner drivers are installed"
         )
@@ -291,12 +388,74 @@ def handle_text(update: Update, context: CallbackContext) -> None:
     )
 
 
+def handle_stdin_scan(command: dict) -> None:
+    device_id = command.get("device_id")
+    notify_telegram = bool(command.get("notify_telegram", False))
+    chat_id = parse_chat_id(config.telegram.chat_id)
+    log_ha_event(
+        f"STDIN scan requested (device_id={device_id or 'default'})",
+        level="info",
+    )
+    scanned_files: list[Path] = []
+    try:
+        scanned_files = perform_scan(device_id=device_id)
+        if not scanned_files:
+            log_ha_event("STDIN scan completed with no pages.", level="warning")
+            ha_client.fire_event("scanner_scan_completed", {"pages": 0})
+            return
+        if notify_telegram and telegram_sender and chat_id:
+            send_scanned_files(
+                telegram_sender,
+                chat_id,
+                scanned_files,
+                "Scan from Home Assistant",
+            )
+        ha_client.fire_event("scanner_scan_completed", {"pages": len(scanned_files)})
+        log_ha_event(
+            f"STDIN scan completed, pages={len(scanned_files)}",
+            level="info",
+        )
+    except Exception as exc:
+        logger.error("STDIN scan failed: %s", exc)
+        log_ha_event(f"STDIN scan failed: {exc}", level="error")
+        ha_client.fire_event("scanner_scan_failed", {"error": str(exc)})
+
+
+def handle_stdin_line(line: str) -> None:
+    line = line.strip()
+    if not line:
+        return
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError:
+        logger.warning("Invalid STDIN payload: %s", line)
+        log_ha_event(f"Invalid STDIN payload: {line}", level="warning")
+        return
+    command = payload.get("command")
+    if command == "scan":
+        handle_stdin_scan(payload)
+        return
+    logger.warning("Unknown STDIN command: %s", payload)
+    log_ha_event(f"Unknown STDIN command: {payload}", level="warning")
+
+
+def stdin_reader() -> None:
+    for line in sys.stdin:
+        handle_stdin_line(line)
+    logger.info("STDIN reader stopped (EOF).")
+
+
 def main() -> None:
     """Run the bot."""
+    stdin_thread = threading.Thread(
+        target=stdin_reader,
+        name="stdin-reader",
+        daemon=True,
+    )
+    stdin_thread.start()
     if not config.telegram.bot_token:
-        logger.error(
-            "No bot token configured. Please edit the script and set TELEGRAM_BOT_TOKEN."
-        )
+        logger.info("Telegram bot disabled; running in STDIN-only mode.")
+        threading.Event().wait()
         return
     try:
         scanner_bot.initialize_libinsane()

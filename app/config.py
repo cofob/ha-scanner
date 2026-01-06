@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class TelegramConfig(BaseModel):
     """Telegram delivery configuration."""
 
+    enabled: bool = False
     bot_token: str = ""
     chat_id: str = ""
 
@@ -16,6 +17,8 @@ class TelegramConfig(BaseModel):
 class AppConfig(BaseModel):
     """Main application configuration loaded from options.json."""
 
+    save_to: str = "media"
+    subdir: str = "scanner"
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
 
 

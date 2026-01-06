@@ -1,5 +1,5 @@
 name: "Libinsane Scanner"
-version: "0.1.30"
+version: "0.1.31"
 slug: "ha_scanner"
 description: "Scan documents using libinsane with Telegram integration"
 url: "https://github.com/cofob/ha-scanner"
@@ -21,7 +21,8 @@ devices:
 full_access: false
 audio: false
 host_network: true
-stdin: false
+stdin: true
+homeassistant_api: true
 init: false
 options:
   device_id: ""

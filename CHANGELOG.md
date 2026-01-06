@@ -2,6 +2,13 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.31] - 2026-01-07
+
+### Added
+- STDIN scan command handling with Home Assistant system log/event reporting.
+- Telegram scan logging to Home Assistant including username and chat id.
+- Scan output directory now respects add-on `save_to` and `subdir` options.
+
 ## [0.1.0] - 2024-01-16
 
 ### Added
