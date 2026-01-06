@@ -774,6 +774,25 @@ def handle_stdin_line(line: str) -> None:
         logger.warning("Invalid STDIN payload: %s", line)
         log_ha_event(f"Invalid STDIN payload: {line}", level="warning")
         return
+    if isinstance(payload, dict) and "input" in payload:
+        payload = payload["input"]
+    if isinstance(payload, str):
+        stripped = payload.strip()
+        if stripped.startswith("{") or stripped.startswith("["):
+            try:
+                payload = json.loads(stripped)
+            except json.JSONDecodeError:
+                logger.warning("Invalid STDIN payload: %s", payload)
+                log_ha_event(f"Invalid STDIN payload: {payload}", level="warning")
+                return
+        else:
+            logger.warning("Invalid STDIN payload: %s", payload)
+            log_ha_event(f"Invalid STDIN payload: {payload}", level="warning")
+            return
+    if not isinstance(payload, dict):
+        logger.warning("Invalid STDIN payload: %s", payload)
+        log_ha_event(f"Invalid STDIN payload: {payload}", level="warning")
+        return
     command = payload.get("command")
     if command == "scan":
         handle_stdin_scan(payload)

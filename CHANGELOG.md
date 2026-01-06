@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.40] - 2026-01-07
+
+### Fixed
+- STDIN payload parsing now handles wrapped `input` and JSON strings.
+
 ## [0.1.39] - 2026-01-07
 
 ### Fixed
