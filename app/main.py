@@ -791,7 +791,9 @@ def handle_stdin_line(line: str) -> None:
 
 def stdin_reader() -> None:
     stdin_path = Path("/proc/1/fd/0")
-    while True:
+    retry_count = 0
+    max_retries = 15
+    while retry_count < max_retries:
         stream = None
         try:
             if stdin_path.exists():
@@ -801,10 +803,13 @@ def stdin_reader() -> None:
                 stream = sys.stdin
                 logger.info("STDIN reader attached to sys.stdin")
             for line in stream:
+                retry_count = 0
                 handle_stdin_line(line)
-            logger.info("STDIN reader stopped (EOF).")
+            logger.info("STDIN reader reached EOF; reopening...")
+            retry_count += 1
         except Exception as exc:
             logger.warning("STDIN reader error: %s", exc)
+            retry_count += 1
         finally:
             if stream and stream is not sys.stdin:
                 try:
@@ -812,6 +817,7 @@ def stdin_reader() -> None:
                 except Exception:
                     pass
         time.sleep(0.5)
+    logger.error("STDIN reader stopped after %s retries.", max_retries)
 
 
 def main() -> None:

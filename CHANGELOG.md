@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.37] - 2026-01-07
+
+### Fixed
+- STDIN reader retry loop now stops after 15 attempts.
+
 ## [0.1.36] - 2026-01-07
 
 ### Fixed
