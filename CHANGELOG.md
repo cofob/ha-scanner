@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.39] - 2026-01-07
+
+### Fixed
+- Start scanner service via module execution to preserve package imports.
+
 ## [0.1.38] - 2026-01-07
 
 ### Fixed
