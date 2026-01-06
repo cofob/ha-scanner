@@ -6,7 +6,8 @@ import logging
 import os
 import sys
 import threading
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from .config import load_config
@@ -81,6 +82,17 @@ class HomeAssistantClient:
 
 
 ha_client = HomeAssistantClient(os.environ.get("SUPERVISOR_TOKEN"))
+
+
+PDF_QUEUE_WINDOW = timedelta(minutes=30)
+
+
+@dataclass
+class QueuedImage:
+    path: Path
+    scanned_at: datetime
+    chat_id: Optional[int]
+    message_id: Optional[int]
 
 
 class ScannerBot:
@@ -216,6 +228,8 @@ scanner_bot = ScannerBot(
 )
 scan_lock = threading.Lock()
 telegram_sender = Bot(config.telegram.bot_token) if config.telegram.bot_token else None
+pdf_queue: list[QueuedImage] = []
+pdf_queue_lock = threading.Lock()
 
 
 def log_ha_event(message: str, level: str = "info") -> None:
@@ -239,15 +253,112 @@ def get_output_dir() -> Path:
     return Path(base) / subdir
 
 
-def send_scanned_files(
-    bot: Bot, chat_id: int, scanned_files: list[Path], caption_prefix: str
+def queue_scanned_files(
+    scanned_files: list[Path],
+    chat_id: Optional[int],
+    message_ids: Optional[list[int]] = None,
 ) -> None:
     if not scanned_files:
         return
+    scanned_at = datetime.now()
+    with pdf_queue_lock:
+        cutoff = scanned_at - PDF_QUEUE_WINDOW
+        pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
+        for index, path in enumerate(scanned_files):
+            message_id = None
+            if message_ids and index < len(message_ids):
+                message_id = message_ids[index]
+            pdf_queue.append(
+                QueuedImage(
+                    path=path,
+                    scanned_at=scanned_at,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                )
+            )
+
+
+def get_recent_queue_items(chat_id: Optional[int]) -> list[QueuedImage]:
+    cutoff = datetime.now() - PDF_QUEUE_WINDOW
+    with pdf_queue_lock:
+        pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
+        items = [
+            item
+            for item in pdf_queue
+            if chat_id is None or item.chat_id == chat_id
+        ]
+    return items
+
+
+def remove_queue_items(items: list[QueuedImage]) -> None:
+    if not items:
+        return
+    item_ids = {id(item) for item in items}
+    with pdf_queue_lock:
+        pdf_queue[:] = [item for item in pdf_queue if id(item) not in item_ids]
+
+
+def remove_queue_item_by_message(
+    chat_id: int, message_id: int
+) -> Optional[QueuedImage]:
+    with pdf_queue_lock:
+        for index, item in enumerate(pdf_queue):
+            if item.chat_id == chat_id and item.message_id == message_id:
+                return pdf_queue.pop(index)
+    return None
+
+
+def images_to_pdf(image_paths: list[Path], output_pdf: Path) -> int:
+    if not image_paths:
+        raise ValueError("No images provided.")
+    images = []
+    for path in image_paths:
+        if not path.exists():
+            logger.warning("Skipping missing image for PDF: %s", path)
+            continue
+        img = Image.open(path)
+        if img.mode in ("RGBA", "P") or img.mode != "RGB":
+            img = img.convert("RGB")
+        images.append(img)
+    if not images:
+        raise ValueError("No valid images available for PDF.")
+    first_image, remaining_images = images[0], images[1:]
+    output_pdf.parent.mkdir(parents=True, exist_ok=True)
+    first_image.save(
+        output_pdf,
+        save_all=True,
+        append_images=remaining_images,
+    )
+    return len(images)
+
+
+def build_pdf_from_queue(chat_id: Optional[int]) -> tuple[Optional[Path], int]:
+    items = get_recent_queue_items(chat_id)
+    if not items:
+        return None, 0
+    items.sort(key=lambda item: (item.scanned_at, item.path.name))
+    output_dir = get_output_dir()
+    pdf_name = datetime.now().strftime("scan_%Y%m%d_%H%M%S.pdf")
+    output_path = output_dir / pdf_name
+    image_paths = [item.path for item in items]
+    page_count = images_to_pdf(image_paths, output_path)
+    remove_queue_items(items)
+    return output_path, page_count
+
+
+def send_scanned_files(
+    bot: Bot, chat_id: int, scanned_files: list[Path], caption_prefix: str
+) -> list[int]:
+    if not scanned_files:
+        return []
     if len(scanned_files) == 1:
         with open(scanned_files[0], "rb") as photo:
-            bot.send_photo(photo=photo, chat_id=chat_id, caption=caption_prefix)
-        return
+            message = bot.send_photo(
+                photo=photo,
+                chat_id=chat_id,
+                caption=caption_prefix,
+            )
+        return [message.message_id]
     media_group = []
     for i, file_path in enumerate(scanned_files):
         file_bytes = file_path.read_bytes()
@@ -257,7 +368,8 @@ def send_scanned_files(
                 caption=f"{caption_prefix} - Page {i + 1}" if i == 0 else None,
             )
         )
-    bot.send_media_group(chat_id=chat_id, media=media_group)
+    messages = bot.send_media_group(chat_id=chat_id, media=media_group)
+    return [message.message_id for message in messages]
 
 
 def perform_scan(device_id: Optional[str] = None) -> list[Path]:
@@ -283,6 +395,8 @@ def start_command(update: Update, context: CallbackContext) -> None:
         "Available commands:\n"
         "/scan - Scan a document using the connected scanner\n"
         "/devices - List available scanner devices\n"
+        "/pdf - Combine recent scans into a single PDF\n"
+        "/delete - Reply to a scan to delete it and remove from the PDF queue\n"
         "/help - Show this help message\n\n"
         "Simply place a document in your scanner and use /scan to start scanning."
     )
@@ -300,6 +414,8 @@ def help_command(update: Update, context: CallbackContext) -> None:
         "Document Scanner Bot Help:\n\n"
         "• /scan - Scan a document from the connected scanner\n"
         "• /devices - List available scanner devices\n"
+        "• /pdf - Combine scans from the last 30 minutes into a PDF\n"
+        "• /delete - Reply to a scan to delete it and remove from the PDF queue\n"
         "• /help - Show this help message\n\n"
         "To scan a document:\n"
         "1. Place your document in the scanner\n"
@@ -355,12 +471,13 @@ def scan_command(update: Update, context: CallbackContext) -> None:
                 "No pages were scanned. Please check if a document is loaded in the scanner."
             )
             return
-        send_scanned_files(
+        message_ids = send_scanned_files(
             context.bot,
             chat_id,
             scanned_files,
             "Here's your scanned document!",
         )
+        queue_scanned_files(scanned_files, chat_id, message_ids)
         update.message.reply_text(
             f"Scan complete! Sent {len(scanned_files)} page(s)."
         )
@@ -376,6 +493,76 @@ def scan_command(update: Update, context: CallbackContext) -> None:
         )
         update.message.reply_text(
             f"Error during scanning: {str(e)}\n\nPlease check:\n• Scanner is connected and powered on\n• Document is properly loaded\n• Scanner drivers are installed"
+        )
+
+
+def pdf_command(update: Update, context: CallbackContext) -> None:
+    """Handle /pdf command to combine recent scans into a single PDF."""
+    if not is_authorized(update):
+        update.message.reply_text(
+            "Sorry, you are not authorized to use this bot."
+        )
+        return
+    chat_id = update.effective_chat.id
+    try:
+        update.message.reply_text("Preparing PDF from recent scans...")
+        pdf_path, page_count = build_pdf_from_queue(chat_id)
+        if not pdf_path:
+            update.message.reply_text(
+                "No scans found in the last 30 minutes."
+            )
+            return
+        with open(pdf_path, "rb") as pdf_file:
+            context.bot.send_document(
+                chat_id=chat_id,
+                document=pdf_file,
+                caption=f"PDF ready ({page_count} page(s)).",
+            )
+        update.message.reply_text(
+            f"PDF saved to {pdf_path}."
+        )
+    except Exception as exc:
+        logger.error("PDF generation failed: %s", exc)
+        update.message.reply_text(
+            f"Failed to generate PDF: {exc}"
+        )
+
+
+def delete_command(update: Update, context: CallbackContext) -> None:
+    """Handle /delete command to remove a scan from chat and PDF queue."""
+    if not is_authorized(update):
+        update.message.reply_text(
+            "Sorry, you are not authorized to use this bot."
+        )
+        return
+    if not update.message.reply_to_message:
+        update.message.reply_text(
+            "Reply to the scan you want to delete."
+        )
+        return
+    chat_id = update.effective_chat.id
+    reply_message = update.message.reply_to_message
+    message_id = reply_message.message_id
+    removed_item = remove_queue_item_by_message(chat_id, message_id)
+    file_deleted = False
+    if removed_item and removed_item.path.exists():
+        try:
+            removed_item.path.unlink()
+            file_deleted = True
+        except Exception as exc:
+            logger.warning("Failed to delete scan file %s: %s", removed_item.path, exc)
+    try:
+        context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception as exc:
+        logger.warning("Failed to delete Telegram message %s: %s", message_id, exc)
+    if removed_item:
+        update.message.reply_text(
+            "Scan removed from the PDF queue."
+            + (" File deleted." if file_deleted else "")
+        )
+    else:
+        update.message.reply_text(
+            "Scan message removed from chat. It was not in the PDF queue."
         )
 
 
@@ -403,13 +590,15 @@ def handle_stdin_scan(command: dict) -> None:
             log_ha_event("STDIN scan completed with no pages.", level="warning")
             ha_client.fire_event("scanner_scan_completed", {"pages": 0})
             return
+        message_ids: list[int] = []
         if notify_telegram and telegram_sender and chat_id:
-            send_scanned_files(
+            message_ids = send_scanned_files(
                 telegram_sender,
                 chat_id,
                 scanned_files,
                 "Scan from Home Assistant",
             )
+        queue_scanned_files(scanned_files, chat_id, message_ids or None)
         ha_client.fire_event("scanner_scan_completed", {"pages": len(scanned_files)})
         log_ha_event(
             f"STDIN scan completed, pages={len(scanned_files)}",
@@ -419,6 +608,33 @@ def handle_stdin_scan(command: dict) -> None:
         logger.error("STDIN scan failed: %s", exc)
         log_ha_event(f"STDIN scan failed: {exc}", level="error")
         ha_client.fire_event("scanner_scan_failed", {"error": str(exc)})
+
+
+def handle_stdin_pdf(command: dict) -> None:
+    chat_id = parse_chat_id(config.telegram.chat_id)
+    log_ha_event("STDIN PDF requested", level="info")
+    try:
+        pdf_path, page_count = build_pdf_from_queue(chat_id)
+        if not pdf_path:
+            log_ha_event("STDIN PDF completed with no recent scans.", level="warning")
+            ha_client.fire_event("scanner_pdf_completed", {"pages": 0})
+            return
+        if telegram_sender and chat_id:
+            with open(pdf_path, "rb") as pdf_file:
+                telegram_sender.send_document(
+                    chat_id=chat_id,
+                    document=pdf_file,
+                    caption=f"PDF ready ({page_count} page(s)).",
+                )
+        ha_client.fire_event("scanner_pdf_completed", {"pages": page_count})
+        log_ha_event(
+            f"STDIN PDF completed, pages={page_count}",
+            level="info",
+        )
+    except Exception as exc:
+        logger.error("STDIN PDF failed: %s", exc)
+        log_ha_event(f"STDIN PDF failed: {exc}", level="error")
+        ha_client.fire_event("scanner_pdf_failed", {"error": str(exc)})
 
 
 def handle_stdin_line(line: str) -> None:
@@ -434,6 +650,9 @@ def handle_stdin_line(line: str) -> None:
     command = payload.get("command")
     if command == "scan":
         handle_stdin_scan(payload)
+        return
+    if command == "pdf":
+        handle_stdin_pdf(payload)
         return
     logger.warning("Unknown STDIN command: %s", payload)
     log_ha_event(f"Unknown STDIN command: {payload}", level="warning")
@@ -468,6 +687,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("devices", devices_command))
     dispatcher.add_handler(CommandHandler("scan", scan_command))
+    dispatcher.add_handler(CommandHandler("pdf", pdf_command))
+    dispatcher.add_handler(CommandHandler("delete", delete_command))
     dispatcher.add_handler(MessageHandler(filters.Filters.text, handle_text))
     logger.info("Starting Telegram bot...")
     updater.start_polling()

@@ -2,6 +2,13 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.32] - 2026-01-07
+
+### Added
+- Telegram `/pdf` command to combine scans from the last 30 minutes into a PDF saved to the output folder.
+- Telegram `/delete` command to remove a scanned image from chat and the PDF queue.
+- STDIN `pdf` command for automation-driven PDF generation and delivery.
+
 ## [0.1.31] - 2026-01-07
 
 ### Added
