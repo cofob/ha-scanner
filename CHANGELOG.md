@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.33] - 2026-01-07
+
+### Fixed
+- Supervisor API base URL for system log and event calls.
+
 ## [0.1.32] - 2026-01-07
 
 ### Added

@@ -39,7 +39,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-HA_BASE_URL = "http://supervisor/core/api"
+HA_BASE_URL = "http://supervisor/core"
 
 
 class HomeAssistantClient:
