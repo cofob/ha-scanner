@@ -4,9 +4,7 @@
 import json
 import logging
 import os
-import sys
 import threading
-import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -32,6 +30,7 @@ config = load_config()
 gi.require_version("Libinsane", "1.0")
 from gi.repository import Libinsane
 from PIL import Image
+import socket
 
 # Configure logging
 logging.basicConfig(
@@ -789,42 +788,31 @@ def handle_stdin_line(line: str) -> None:
     log_ha_event(f"Unknown STDIN command: {payload}", level="warning")
 
 
-def stdin_reader() -> None:
-    stdin_path = Path("/proc/1/fd/0")
-    retry_count = 0
-    max_retries = 15
-    while retry_count < max_retries:
-        stream = None
+def stdin_socket_server() -> None:
+    socket_path = Path("/tmp/ha_stdin.sock")
+    if socket_path.exists():
         try:
-            if stdin_path.exists():
-                stream = stdin_path.open("r", encoding="utf-8", errors="replace")
-                logger.info("STDIN reader attached to /proc/1/fd/0")
-            else:
-                stream = sys.stdin
-                logger.info("STDIN reader attached to sys.stdin")
-            for line in stream:
-                retry_count = 0
-                handle_stdin_line(line)
-            logger.info("STDIN reader reached EOF; reopening...")
-            retry_count += 1
+            socket_path.unlink()
         except Exception as exc:
-            logger.warning("STDIN reader error: %s", exc)
-            retry_count += 1
-        finally:
-            if stream and stream is not sys.stdin:
-                try:
-                    stream.close()
-                except Exception:
-                    pass
-        time.sleep(0.5)
-    logger.error("STDIN reader stopped after %s retries.", max_retries)
+            logger.warning("Failed to remove existing stdin socket: %s", exc)
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    server.bind(str(socket_path))
+    logger.info("STDIN socket server listening at %s", socket_path)
+    while True:
+        data, _ = server.recvfrom(65535)
+        if not data:
+            continue
+        try:
+            handle_stdin_line(data.decode("utf-8", errors="replace"))
+        except Exception as exc:
+            logger.warning("STDIN socket handling error: %s", exc)
 
 
 def main() -> None:
     """Run the bot."""
     stdin_thread = threading.Thread(
-        target=stdin_reader,
-        name="stdin-reader",
+        target=stdin_socket_server,
+        name="stdin-socket",
         daemon=True,
     )
     stdin_thread.start()

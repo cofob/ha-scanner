@@ -39,3 +39,4 @@ COPY app ./app
 
 EXPOSE 46201
 
+CMD [ "/run.sh" ]

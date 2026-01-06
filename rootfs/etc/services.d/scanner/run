@@ -15,5 +15,5 @@ sleep 10
 
 bashio::log.info "Starting Scanner Add-on..."
 
-# Execute the run script
-exec /usr/local/bin/run.sh
+# Execute the scanner service
+exec python3 -u /opt/scanner/app/main.py

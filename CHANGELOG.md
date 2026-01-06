@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.38] - 2026-01-07
+
+### Fixed
+- STDIN bridge now forwards Supervisor input to the scanner daemon via a Unix socket.
+
 ## [0.1.37] - 2026-01-07
 
 ### Fixed
