@@ -103,6 +103,16 @@ The add-on accepts JSON commands via STDIN.
 - Saves the PDF to the output folder.
 - Clears the queued items used for the PDF.
 
+### Delete Last Scan
+
+```json
+{"command": "delete"}
+```
+
+- Removes the most recent scan from the PDF queue.
+- Deletes the scan file from disk when available.
+- Deletes the corresponding Telegram message when available.
+
 ### Resolution Override
 
 ```json

@@ -473,6 +473,25 @@ def remove_queue_item_by_message(
     return None
 
 
+def pop_last_queue_item(chat_id: Optional[int]) -> Optional[QueuedImage]:
+    cutoff = datetime.now() - PDF_QUEUE_WINDOW
+    with pdf_queue_lock:
+        pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
+        if chat_id is None:
+            candidates = [item for item in pdf_queue if item.chat_id is None]
+        else:
+            candidates = [item for item in pdf_queue if item.chat_id == chat_id]
+        if not candidates:
+            return None
+        last_item = max(
+            candidates, key=lambda item: (item.scanned_at, item.path.name)
+        )
+        for index, item in enumerate(pdf_queue):
+            if item is last_item:
+                return pdf_queue.pop(index)
+    return None
+
+
 def images_to_pdf(image_paths: list[Path], output_pdf: Path) -> int:
     if not image_paths:
         raise ValueError("No images provided.")
@@ -1138,6 +1157,11 @@ def handle_stdin_pdf(command: dict) -> None:
         pdf_path, page_count = build_pdf_from_queue(chat_id)
         if not pdf_path:
             log_ha_event("STDIN PDF completed with no recent scans.", level="warning")
+            if telegram_sender and chat_id:
+                telegram_sender.send_message(
+                    chat_id=chat_id,
+                    text="No scans found in the last 30 minutes.",
+                )
             ha_client.fire_event("scanner_pdf_completed", {"pages": 0})
             return
         if telegram_sender and chat_id:
@@ -1178,6 +1202,62 @@ def handle_stdin_resolution(command: dict) -> None:
         f"STDIN resolution set to {dpi} DPI (expires {expires_at.isoformat(timespec='seconds')})",
         level="info",
     )
+
+
+def handle_stdin_delete(command: dict) -> None:
+    chat_id = parse_chat_id(config.telegram.chat_id)
+    log_ha_event("STDIN delete requested", level="info")
+    try:
+        removed_item = pop_last_queue_item(chat_id)
+        if not removed_item:
+            log_ha_event("STDIN delete found no queued scans.", level="warning")
+            if telegram_sender and chat_id:
+                telegram_sender.send_message(
+                    chat_id=chat_id,
+                    text="No scans found to delete.",
+                )
+            ha_client.fire_event("scanner_delete_completed", {"deleted": False})
+            return
+        file_deleted = False
+        if removed_item.path.exists():
+            try:
+                removed_item.path.unlink()
+                file_deleted = True
+            except Exception as exc:
+                logger.warning(
+                    "Failed to delete scan file %s: %s", removed_item.path, exc
+                )
+        if (
+            telegram_sender
+            and chat_id
+            and removed_item.message_id is not None
+        ):
+            try:
+                telegram_sender.delete_message(
+                    chat_id=chat_id, message_id=removed_item.message_id
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to delete Telegram message %s: %s",
+                    removed_item.message_id,
+                    exc,
+                )
+        if telegram_sender and chat_id:
+            status = "Deleted last scan."
+            if not file_deleted:
+                status += " File not found on disk."
+            telegram_sender.send_message(chat_id=chat_id, text=status)
+        ha_client.fire_event(
+            "scanner_delete_completed", {"deleted": True, "file_deleted": file_deleted}
+        )
+        log_ha_event(
+            "STDIN delete completed.",
+            level="info",
+        )
+    except Exception as exc:
+        logger.error("STDIN delete failed: %s", exc)
+        log_ha_event(f"STDIN delete failed: {exc}", level="error")
+        ha_client.fire_event("scanner_delete_failed", {"error": str(exc)})
 
 
 def handle_stdin_line(line: str) -> None:
@@ -1224,6 +1304,9 @@ def handle_stdin_line(line: str) -> None:
         return
     if command in ("resolution", "res"):
         handle_stdin_resolution(payload)
+        return
+    if command == "delete":
+        handle_stdin_delete(payload)
         return
     logger.warning("Unknown STDIN command: %s", payload)
     log_ha_event(f"Unknown STDIN command: {payload}", level="warning")

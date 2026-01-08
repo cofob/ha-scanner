@@ -2,6 +2,14 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.54] - 2026-01-09
+
+### Added
+- STDIN `delete` command to remove the latest queued scan and delete its Telegram message.
+
+### Fixed
+- Send a Telegram warning when STDIN `pdf` runs with an empty queue.
+
 ## [0.1.53] - 2026-01-07
 
 ### Fixed
