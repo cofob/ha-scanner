@@ -13,6 +13,10 @@ from .config import load_config
 
 import gi
 import httpx
+try:
+    import cups
+except ImportError:  # pragma: no cover - guarded for environments without CUPS
+    cups = None
 from telegram import Update, InputMediaPhoto, Bot
 from telegram.ext import (
     Updater,
@@ -270,6 +274,51 @@ def get_output_dir() -> Path:
     return Path(base) / subdir
 
 
+def list_discovered_destinations() -> list:
+    found = []
+
+    def on_dest(_user_data, _flags, dest) -> int:
+        found.append(dest)
+        return 1
+
+    cups.enumDests(on_dest)
+    return found
+
+
+def resolve_printer_name(conn) -> str:
+    preferred = (config.printer_name or "").strip()
+    printers = conn.getPrinters() if conn else {}
+    if preferred:
+        if preferred in printers:
+            return preferred
+        for dest in list_discovered_destinations():
+            if getattr(dest, "name", None) == preferred:
+                return preferred
+        raise ValueError(f"Printer '{preferred}' not found.")
+
+    default_printer = None
+    try:
+        default_printer = conn.getDefault()
+    except Exception:
+        default_printer = None
+
+    if default_printer:
+        return default_printer
+    for name, attrs in printers.items():
+        if attrs.get("printer-is-default"):
+            return name
+    if printers:
+        return sorted(printers.keys())[0]
+
+    destinations = list_discovered_destinations()
+    for dest in destinations:
+        if getattr(dest, "is_default", False):
+            return dest.name
+    if destinations:
+        return destinations[0].name
+    raise ValueError("No printers discovered by CUPS.")
+
+
 def resolve_resolution_level(level: str) -> Optional[int]:
     if not level:
         return None
@@ -468,6 +517,8 @@ def start_command(update: Update, context: CallbackContext) -> None:
         "/devices - List available scanner devices\n"
         "/pdf - Combine recent scans into a single PDF\n"
         "/delete - Reply to a scan to delete it and remove from the PDF queue\n"
+        "/print - Print an attached image (black and white)\n"
+        "/print_color - Print an attached image (color)\n"
         "/res <low|medium|high|xhigh> - Set DPI for 30 minutes\n"
         "/help - Show this help message\n\n"
         "Simply place a document in your scanner and use /scan to start scanning."
@@ -488,6 +539,8 @@ def help_command(update: Update, context: CallbackContext) -> None:
         "• /devices - List available scanner devices\n"
         "• /pdf - Combine scans from the last 30 minutes into a PDF\n"
         "• /delete - Reply to a scan to delete it and remove from the PDF queue\n"
+        "• /print - Print an attached image (black and white)\n"
+        "• /print_color - Print an attached image (color)\n"
         "• /res <low|medium|high|xhigh> - Set DPI for 30 minutes\n"
         "• /help - Show this help message\n\n"
         "To scan a document:\n"
@@ -680,6 +733,111 @@ def handle_text(update: Update, context: CallbackContext) -> None:
     )
 
 
+def is_image_document(document) -> bool:
+    return bool(
+        document and document.mime_type and document.mime_type.startswith("image/")
+    )
+
+
+def is_pdf_document(document) -> bool:
+    return bool(
+        document and document.mime_type and document.mime_type == "application/pdf"
+    )
+
+
+def download_telegram_image(
+    update: Update, context: CallbackContext
+) -> Optional[Path]:
+    message = update.message
+    source = message
+    if not (message.photo or is_image_document(message.document) or is_pdf_document(message.document)):
+        if message.reply_to_message:
+            source = message.reply_to_message
+    file_id = None
+    filename = None
+    if source.photo:
+        file_id = source.photo[-1].file_id
+        filename = f"telegram_{source.message_id}.jpg"
+    elif is_image_document(source.document) or is_pdf_document(source.document):
+        file_id = source.document.file_id
+        filename = source.document.file_name or f"telegram_{source.message_id}"
+    else:
+        return None
+    output_dir = get_output_dir()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    suffix = Path(filename).suffix or ".jpg"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    output_path = output_dir / f"print_{timestamp}{suffix}"
+    file_obj = context.bot.get_file(file_id)
+    file_obj.download(custom_path=str(output_path))
+    return output_path
+
+
+def print_image_file(path: Path, monochrome: bool) -> tuple[str, int]:
+    if cups is None:
+        raise RuntimeError("CUPS Python bindings are not available.")
+    conn = cups.Connection()
+    printer_name = resolve_printer_name(conn)
+    options = {
+        "media": "A4",
+        "fit-to-page": "true",
+        "orientation-requested": "3",
+        "print-color-mode": "monochrome" if monochrome else "color",
+    }
+    job_id = conn.printFile(
+        printer_name,
+        str(path),
+        f"Telegram print {path.name}",
+        options,
+    )
+    return printer_name, job_id
+
+
+def handle_print_command(
+    update: Update, context: CallbackContext, monochrome: bool
+) -> None:
+    if not is_authorized(update):
+        update.message.reply_text(
+            "Sorry, you are not authorized to use this bot."
+        )
+        return
+    if cups is None:
+        update.message.reply_text("Printing is not available in this add-on build.")
+        return
+    image_path = download_telegram_image(update, context)
+    if not image_path:
+        update.message.reply_text(
+            "Send /print as a caption to an image or reply to an image with /print."
+        )
+        return
+    username = update.effective_user.username or update.effective_user.full_name or "unknown"
+    chat_id = update.effective_chat.id
+    try:
+        printer_name, job_id = print_image_file(image_path, monochrome=monochrome)
+        update.message.reply_text(
+            f"Print job sent to {printer_name} (job {job_id})."
+        )
+        log_ha_event(
+            f"Telegram print sent by {username} (chat_id={chat_id}) to {printer_name}, job={job_id}",
+            level="info",
+        )
+    except Exception as exc:
+        logger.error("Telegram print failed: %s", exc)
+        log_ha_event(
+            f"Telegram print failed for {username} (chat_id={chat_id}): {exc}",
+            level="error",
+        )
+        update.message.reply_text(f"Failed to print image: {exc}")
+
+
+def print_bw_command(update: Update, context: CallbackContext) -> None:
+    handle_print_command(update, context, monochrome=True)
+
+
+def print_color_command(update: Update, context: CallbackContext) -> None:
+    handle_print_command(update, context, monochrome=False)
+
+
 def handle_stdin_scan(command: dict) -> None:
     device_id = command.get("device_id")
     notify_telegram = bool(command.get("notify_telegram", False))
@@ -850,6 +1008,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("devices", devices_command))
     dispatcher.add_handler(CommandHandler("scan", scan_command))
+    dispatcher.add_handler(CommandHandler("print", print_bw_command))
+    dispatcher.add_handler(CommandHandler("print_color", print_color_command))
     dispatcher.add_handler(CommandHandler("res", res_command))
     dispatcher.add_handler(CommandHandler("pdf", pdf_command))
     dispatcher.add_handler(CommandHandler("delete", delete_command))

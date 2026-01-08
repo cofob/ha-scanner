@@ -6,6 +6,7 @@ This add-on provides Telegram and Home Assistant automation support for scanning
 
 - Scan documents with libinsane and save them to disk.
 - Telegram bot commands for scanning, device listing, PDF creation, and cleanup.
+- Telegram commands to print attached images via CUPS.
 - Home Assistant automation support via STDIN commands.
 - Outputs saved to `/media/<subdir>` or `/share/<subdir>` based on config.
 - Temporary DPI overrides via Telegram or STDIN commands.
@@ -33,6 +34,12 @@ This add-on provides Telegram and Home Assistant automation support for scanning
 - `/res <low|medium|high|xhigh>`
   - Temporarily sets scan DPI for the next 30 minutes.
   - Presets: low=150, medium=300, high=600, xhigh=1200.
+- `/print`
+  - Print an attached image or PDF in black and white via CUPS.
+  - Send the command as a caption to an image/PDF or reply to one.
+- `/print_color`
+  - Print an attached image or PDF in color via CUPS.
+  - Send the command as a caption to an image/PDF or reply to one.
 - `/pdf`
   - Combines queued scans from the last 30 minutes into a single PDF.
   - Sends the PDF to the chat and saves it to the output folder.
@@ -96,6 +103,8 @@ The add-on accepts JSON commands via STDIN.
 - `save_to`: `media` or `share` to control output base.
 - `subdir`: Output subdirectory under the base path.
 - `resolution`: Default scan DPI when no override is active.
+- `printer_name`: Optional CUPS printer/queue name. If empty, the first available
+  printer discovered by CUPS is used.
 
 ## Notes and Limitations
 

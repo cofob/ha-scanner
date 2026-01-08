@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start the CUPS daemon service
+# ==============================================================================
+
+bashio::log.info "Starting CUPS daemon..."
+
+mkdir -p /var/run/cups
+
+exec /usr/sbin/cupsd -f

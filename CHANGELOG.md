@@ -2,6 +2,12 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.41] - 2026-01-07
+
+### Added
+- Telegram /print and /print_color commands to print attached images or PDFs via CUPS.
+- CUPS service startup and optional printer selection via config.
+
 ## [0.1.40] - 2026-01-07
 
 ### Fixed

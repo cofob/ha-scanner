@@ -1,5 +1,5 @@
 name: "Libinsane Scanner"
-version: "0.1.40"
+version: "0.1.41"
 slug: "ha_scanner"
 description: "Scan documents using libinsane with Telegram integration"
 url: "https://github.com/cofob/ha-scanner"
@@ -32,6 +32,7 @@ options:
   save_to: "media"
   subdir: "scanner"
   resolution: 300
+  printer_name: ""
   telegram:
     enabled: false
     bot_token: ""
@@ -46,6 +47,7 @@ schema:
   save_to: list(media|share)
   subdir: str
   resolution: int(75,1200)
+  printer_name: str?
   telegram:
     enabled: bool
     bot_token: str?
