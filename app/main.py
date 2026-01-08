@@ -711,9 +711,11 @@ def copy_command(update: Update, context: CallbackContext, monochrome: bool) -> 
             "Sorry, you are not authorized to use this bot."
         )
         return
-    if cups is None:
-        update.message.reply_text("Printing is not available in this add-on build.")
-        return
+    can_print = cups is not None
+    if not can_print:
+        update.message.reply_text(
+            "Printing is not available in this add-on build. Scans will still be sent."
+        )
     username = update.effective_user.username or update.effective_user.full_name or "unknown"
     chat_id = update.effective_chat.id
     log_ha_event(
@@ -729,19 +731,27 @@ def copy_command(update: Update, context: CallbackContext, monochrome: bool) -> 
             )
             log_ha_event("Telegram copy completed with no pages.", level="warning")
             return
+        caption = (
+            "Scan complete. Sending to printer..." if can_print else "Scan complete."
+        )
         message_ids = send_scanned_files(
             context.bot,
             chat_id,
             scanned_files,
-            "Scan complete. Sending to printer...",
+            caption,
         )
         queue_scanned_files(scanned_files, chat_id, message_ids)
-        job_ids = print_scanned_files(scanned_files, monochrome=monochrome)
-        update.message.reply_text(
-            f"Copy complete. Printed {len(job_ids)} page(s)."
-        )
+        if can_print:
+            job_ids = print_scanned_files(scanned_files, monochrome=monochrome)
+            update.message.reply_text(
+                f"Copy complete. Printed {len(job_ids)} page(s)."
+            )
+        else:
+            update.message.reply_text(
+                "Scan complete. Printing skipped because CUPS is unavailable."
+            )
         log_ha_event(
-            f"Telegram copy completed for {username} (chat_id={chat_id}), pages={len(job_ids)}",
+            f"Telegram copy completed for {username} (chat_id={chat_id}), pages={len(scanned_files)}",
             level="info",
         )
     except Exception as exc:

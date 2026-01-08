@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.48] - 2026-01-07
+
+### Fixed
+- Always deliver scanned images for /copy commands even if printing is unavailable.
+
 ## [0.1.47] - 2026-01-07
 
 ### Fixed
