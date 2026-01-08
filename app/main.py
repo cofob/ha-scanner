@@ -514,6 +514,8 @@ def start_command(update: Update, context: CallbackContext) -> None:
         "Welcome to the Document Scanner Bot! 📄\n\n"
         "Available commands:\n"
         "/scan - Scan a document using the connected scanner\n"
+        "/copy - Scan and print (black and white)\n"
+        "/copy_color - Scan and print (color)\n"
         "/devices - List available scanner devices\n"
         "/pdf - Combine recent scans into a single PDF\n"
         "/delete - Reply to a scan to delete it and remove from the PDF queue\n"
@@ -536,6 +538,8 @@ def help_command(update: Update, context: CallbackContext) -> None:
     help_text = (
         "Document Scanner Bot Help:\n\n"
         "• /scan - Scan a document from the connected scanner\n"
+        "• /copy - Scan and print (black and white)\n"
+        "• /copy_color - Scan and print (color)\n"
         "• /devices - List available scanner devices\n"
         "• /pdf - Combine scans from the last 30 minutes into a PDF\n"
         "• /delete - Reply to a scan to delete it and remove from the PDF queue\n"
@@ -652,6 +656,77 @@ def scan_command(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(
             f"Error during scanning: {str(e)}\n\nPlease check:\n• Scanner is connected and powered on\n• Document is properly loaded\n• Scanner drivers are installed"
         )
+
+
+def print_scanned_files(
+    scanned_files: list[Path], monochrome: bool
+) -> list[int]:
+    if cups is None:
+        raise RuntimeError("CUPS Python bindings are not available.")
+    job_ids: list[int] = []
+    for file_path in scanned_files:
+        _, job_id = print_image_file(file_path, monochrome=monochrome)
+        job_ids.append(job_id)
+    return job_ids
+
+
+def copy_command(update: Update, context: CallbackContext, monochrome: bool) -> None:
+    """Handle /copy commands: scan then print immediately."""
+    if not is_authorized(update):
+        update.message.reply_text(
+            "Sorry, you are not authorized to use this bot."
+        )
+        return
+    if cups is None:
+        update.message.reply_text("Printing is not available in this add-on build.")
+        return
+    username = update.effective_user.username or update.effective_user.full_name or "unknown"
+    chat_id = update.effective_chat.id
+    log_ha_event(
+        f"Telegram copy requested by {username} (chat_id={chat_id})",
+        level="info",
+    )
+    try:
+        update.message.reply_text("Starting scan and print... Please wait.")
+        scanned_files = perform_scan()
+        if not scanned_files:
+            update.message.reply_text(
+                "No pages were scanned. Please check if a document is loaded in the scanner."
+            )
+            log_ha_event("Telegram copy completed with no pages.", level="warning")
+            return
+        message_ids = send_scanned_files(
+            context.bot,
+            chat_id,
+            scanned_files,
+            "Scan complete. Sending to printer...",
+        )
+        queue_scanned_files(scanned_files, chat_id, message_ids)
+        job_ids = print_scanned_files(scanned_files, monochrome=monochrome)
+        update.message.reply_text(
+            f"Copy complete. Printed {len(job_ids)} page(s)."
+        )
+        log_ha_event(
+            f"Telegram copy completed for {username} (chat_id={chat_id}), pages={len(job_ids)}",
+            level="info",
+        )
+    except Exception as exc:
+        logger.error("Telegram copy failed: %s", exc)
+        log_ha_event(
+            f"Telegram copy failed for {username} (chat_id={chat_id}): {exc}",
+            level="error",
+        )
+        update.message.reply_text(
+            f"Error during copy: {exc}"
+        )
+
+
+def copy_bw_command(update: Update, context: CallbackContext) -> None:
+    copy_command(update, context, monochrome=True)
+
+
+def copy_color_command(update: Update, context: CallbackContext) -> None:
+    copy_command(update, context, monochrome=False)
 
 
 def pdf_command(update: Update, context: CallbackContext) -> None:
@@ -873,6 +948,42 @@ def handle_stdin_scan(command: dict) -> None:
         ha_client.fire_event("scanner_scan_failed", {"error": str(exc)})
 
 
+def handle_stdin_copy(command: dict, monochrome: bool) -> None:
+    device_id = command.get("device_id")
+    notify_telegram = bool(command.get("notify_telegram", False))
+    chat_id = parse_chat_id(config.telegram.chat_id)
+    log_ha_event(
+        f"STDIN copy requested (device_id={device_id or 'default'})",
+        level="info",
+    )
+    scanned_files: list[Path] = []
+    try:
+        scanned_files = perform_scan(device_id=device_id)
+        if not scanned_files:
+            log_ha_event("STDIN copy completed with no pages.", level="warning")
+            ha_client.fire_event("scanner_copy_completed", {"pages": 0})
+            return
+        message_ids: list[int] = []
+        if notify_telegram and telegram_sender and chat_id:
+            message_ids = send_scanned_files(
+                telegram_sender,
+                chat_id,
+                scanned_files,
+                "Scan complete. Sending to printer...",
+            )
+        queue_scanned_files(scanned_files, chat_id, message_ids or None)
+        job_ids = print_scanned_files(scanned_files, monochrome=monochrome)
+        ha_client.fire_event("scanner_copy_completed", {"pages": len(job_ids)})
+        log_ha_event(
+            f"STDIN copy completed, pages={len(job_ids)}",
+            level="info",
+        )
+    except Exception as exc:
+        logger.error("STDIN copy failed: %s", exc)
+        log_ha_event(f"STDIN copy failed: {exc}", level="error")
+        ha_client.fire_event("scanner_copy_failed", {"error": str(exc)})
+
+
 def handle_stdin_pdf(command: dict) -> None:
     chat_id = parse_chat_id(config.telegram.chat_id)
     log_ha_event("STDIN PDF requested", level="info")
@@ -955,6 +1066,12 @@ def handle_stdin_line(line: str) -> None:
     if command == "scan":
         handle_stdin_scan(payload)
         return
+    if command == "copy":
+        handle_stdin_copy(payload, monochrome=True)
+        return
+    if command == "copy_color":
+        handle_stdin_copy(payload, monochrome=False)
+        return
     if command == "pdf":
         handle_stdin_pdf(payload)
         return
@@ -1008,6 +1125,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("devices", devices_command))
     dispatcher.add_handler(CommandHandler("scan", scan_command))
+    dispatcher.add_handler(CommandHandler("copy", copy_bw_command))
+    dispatcher.add_handler(CommandHandler("copy_color", copy_color_command))
     dispatcher.add_handler(CommandHandler("print", print_bw_command))
     dispatcher.add_handler(CommandHandler("print_color", print_color_command))
     dispatcher.add_handler(CommandHandler("res", res_command))

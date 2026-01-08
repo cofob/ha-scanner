@@ -31,6 +31,12 @@ This add-on provides Telegram and Home Assistant automation support for scanning
   - Scans a document from the connected scanner.
   - Sends scanned pages back as photos (single or album).
   - Adds the scanned pages to the in-memory PDF queue.
+- `/copy`
+  - Scans a document, prints it in black and white, and sends scans to the chat.
+  - Adds the scanned pages to the in-memory PDF queue.
+- `/copy_color`
+  - Scans a document, prints it in color, and sends scans to the chat.
+  - Adds the scanned pages to the in-memory PDF queue.
 - `/res <low|medium|high|xhigh>`
   - Temporarily sets scan DPI for the next 30 minutes.
   - Presets: low=150, medium=300, high=600, xhigh=1200.
@@ -69,6 +75,20 @@ The add-on accepts JSON commands via STDIN.
 
 - Performs a scan using the specified device (or default).
 - Saves scan pages to disk.
+- Sends scanned images to Telegram if `notify_telegram` is true.
+- Adds scanned pages to the PDF queue.
+
+### Copy (Scan + Print)
+
+```json
+{"command": "copy", "device_id": "", "notify_telegram": true}
+```
+
+```json
+{"command": "copy_color", "device_id": "", "notify_telegram": true}
+```
+
+- Performs a scan and prints each page immediately.
 - Sends scanned images to Telegram if `notify_telegram` is true.
 - Adds scanned pages to the PDF queue.
 

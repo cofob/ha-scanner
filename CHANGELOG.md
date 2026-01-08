@@ -2,6 +2,12 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.42] - 2026-01-07
+
+### Added
+- Telegram /copy and /copy_color commands to scan and print immediately.
+- STDIN commands `copy` and `copy_color` for scan-and-print automations.
+
 ## [0.1.41] - 2026-01-07
 
 ### Added
