@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.47] - 2026-01-07
+
+### Fixed
+- Allow /print commands to use media from replied messages with images or PDFs.
+
 ## [0.1.46] - 2026-01-07
 
 ### Changed

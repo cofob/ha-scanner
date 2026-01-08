@@ -17,7 +17,7 @@ try:
     import cups
 except ImportError:  # pragma: no cover - guarded for environments without CUPS
     cups = None
-from telegram import Update, InputMediaPhoto, Bot
+from telegram import Update, InputMediaPhoto, Bot, Message
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -870,24 +870,48 @@ def is_pdf_document(document) -> bool:
     )
 
 
+def has_supported_document_extension(document) -> bool:
+    if not document or not document.file_name:
+        return False
+    suffix = Path(document.file_name).suffix.lower()
+    return suffix in {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
+
+
+def has_printable_media(message: Optional[Message]) -> bool:
+    if not message:
+        return False
+    if message.photo:
+        return True
+    if message.document:
+        return (
+            is_image_document(message.document)
+            or is_pdf_document(message.document)
+            or has_supported_document_extension(message.document)
+        )
+    return False
+
+
 def download_telegram_image(
     update: Update, context: CallbackContext
 ) -> Optional[Path]:
     message = update.message
     source = message
-    if not (message.photo or is_image_document(message.document) or is_pdf_document(message.document)):
-        if message.reply_to_message:
-            source = message.reply_to_message
+    if not has_printable_media(source) and message.reply_to_message:
+        source = message.reply_to_message
+    if not has_printable_media(source):
+        return None
     file_id = None
     filename = None
     if source.photo:
         file_id = source.photo[-1].file_id
         filename = f"telegram_{source.message_id}.jpg"
-    elif is_image_document(source.document) or is_pdf_document(source.document):
+    elif source.document and (
+        is_image_document(source.document)
+        or is_pdf_document(source.document)
+        or has_supported_document_extension(source.document)
+    ):
         file_id = source.document.file_id
         filename = source.document.file_name or f"telegram_{source.message_id}"
-    else:
-        return None
     output_dir = get_output_dir()
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = Path(filename).suffix or ".jpg"
