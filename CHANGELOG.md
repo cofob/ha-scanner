@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.46] - 2026-01-07
+
+### Changed
+- Expire cached scanner device after 8 hours and clear it on scan errors.
+
 ## [0.1.45] - 2026-01-07
 
 ### Changed

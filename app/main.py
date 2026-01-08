@@ -109,12 +109,15 @@ class QueuedImage:
 class ScannerBot:
     """Telegram bot for document scanning using libinsane."""
 
+    DEVICE_CACHE_TTL = timedelta(hours=8)
+
     def __init__(self, token: str, allowed_chat_ids: list[str] = None):
         """Initialize the bot with token and allowed chat IDs."""
         self.token = token
         self.allowed_chat_ids = allowed_chat_ids or []
         self.api = None
         self.cached_device_id = None
+        self.cached_device_id_expires_at = None
 
     def initialize_libinsane(self):
         """Initialize libinsane API."""
@@ -158,6 +161,11 @@ class ScannerBot:
             self.initialize_libinsane()
         session = None
         try:
+            if self.cached_device_id and self.cached_device_id_expires_at:
+                if datetime.now() >= self.cached_device_id_expires_at:
+                    logger.info("Cached scanner device expired; re-discovering")
+                    self.cached_device_id = None
+                    self.cached_device_id_expires_at = None
             resolved_device_id = device_id or self.cached_device_id
             if resolved_device_id:
                 try:
@@ -170,6 +178,7 @@ class ScannerBot:
                         resolved_device_id,
                     )
                     self.cached_device_id = None
+                    self.cached_device_id_expires_at = None
                     resolved_device_id = None
             if not resolved_device_id:
                 devices = self.api.list_devices(Libinsane.DeviceLocations.ANY)
@@ -180,8 +189,14 @@ class ScannerBot:
                 logger.info(f"Using first available device: {device.get_name()}")
             if device_id:
                 self.cached_device_id = device_id
+                self.cached_device_id_expires_at = (
+                    datetime.now() + self.DEVICE_CACHE_TTL
+                )
             elif self.cached_device_id is None:
                 self.cached_device_id = resolved_device_id
+                self.cached_device_id_expires_at = (
+                    datetime.now() + self.DEVICE_CACHE_TTL
+                )
             logger.info(f"Using device: {device.get_name()}")
             sources = device.get_children()
             if not sources:
@@ -245,6 +260,8 @@ class ScannerBot:
             return saved_files
         except Exception as e:
             logger.error(f"Error during scanning: {e}")
+            self.cached_device_id = None
+            self.cached_device_id_expires_at = None
             raise
         finally:
             if session:
