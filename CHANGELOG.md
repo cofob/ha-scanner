@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.45] - 2026-01-07
+
+### Changed
+- Cache the selected scanner device after the first scan to speed up subsequent scans.
+
 ## [0.1.44] - 2026-01-07
 
 ### Changed

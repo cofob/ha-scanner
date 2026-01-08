@@ -114,6 +114,7 @@ class ScannerBot:
         self.token = token
         self.allowed_chat_ids = allowed_chat_ids or []
         self.api = None
+        self.cached_device_id = None
 
     def initialize_libinsane(self):
         """Initialize libinsane API."""
@@ -157,14 +158,30 @@ class ScannerBot:
             self.initialize_libinsane()
         session = None
         try:
-            if device_id:
-                device = self.api.get_device(device_id)
-            else:
+            resolved_device_id = device_id or self.cached_device_id
+            if resolved_device_id:
+                try:
+                    device = self.api.get_device(resolved_device_id)
+                except Exception:
+                    if device_id:
+                        raise
+                    logger.warning(
+                        "Cached scanner device '%s' no longer available; re-discovering",
+                        resolved_device_id,
+                    )
+                    self.cached_device_id = None
+                    resolved_device_id = None
+            if not resolved_device_id:
                 devices = self.api.list_devices(Libinsane.DeviceLocations.ANY)
                 if not devices:
                     raise Exception("No scanner devices found")
-                device = self.api.get_device(devices[0].get_dev_id())
+                resolved_device_id = devices[0].get_dev_id()
+                device = self.api.get_device(resolved_device_id)
                 logger.info(f"Using first available device: {device.get_name()}")
+            if device_id:
+                self.cached_device_id = device_id
+            elif self.cached_device_id is None:
+                self.cached_device_id = resolved_device_id
             logger.info(f"Using device: {device.get_name()}")
             sources = device.get_children()
             if not sources:
