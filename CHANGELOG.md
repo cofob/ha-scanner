@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.56] - 2026-01-09
+
+### Added
+- Trigger a scan immediately after service start.
+
 ## [0.1.55] - 2026-01-09
 
 ### Fixed
