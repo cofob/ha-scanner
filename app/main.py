@@ -808,6 +808,22 @@ def handle_text(update: Update, context: CallbackContext) -> None:
     )
 
 
+def handle_caption_command(update: Update, context: CallbackContext) -> None:
+    """Handle commands sent as a caption on photos/documents."""
+    if not update.message or not update.message.caption:
+        return
+    caption = update.message.caption.strip()
+    if not caption.startswith("/"):
+        return
+    command = caption.split(maxsplit=1)[0].lower()
+    if command.startswith("/print_color"):
+        print_color_command(update, context)
+        return
+    if command.startswith("/print"):
+        print_bw_command(update, context)
+        return
+
+
 def is_image_document(document) -> bool:
     return bool(
         document and document.mime_type and document.mime_type.startswith("image/")
@@ -1132,6 +1148,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("res", res_command))
     dispatcher.add_handler(CommandHandler("pdf", pdf_command))
     dispatcher.add_handler(CommandHandler("delete", delete_command))
+    dispatcher.add_handler(MessageHandler(filters.Filters.caption, handle_caption_command))
     dispatcher.add_handler(MessageHandler(filters.Filters.text, handle_text))
     logger.info("Starting Telegram bot...")
     updater.start_polling()
