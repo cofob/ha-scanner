@@ -35,6 +35,20 @@ def load_config() -> AppConfig:
     try:
         with open(config_path, "r") as f:
             data = json.load(f)
+        telegram = data.get("telegram")
+        if isinstance(telegram, dict):
+            admin_ids = telegram.get("admin_ids")
+            if isinstance(admin_ids, str):
+                parsed_ids = []
+                for entry in admin_ids.split(","):
+                    entry = entry.strip()
+                    if not entry:
+                        continue
+                    try:
+                        parsed_ids.append(int(entry))
+                    except ValueError:
+                        continue
+                telegram["admin_ids"] = parsed_ids
         return AppConfig(**data)
     except Exception as e:
         print(f"Warning: Failed to load options.json, using defaults: {e}")

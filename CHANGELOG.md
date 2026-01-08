@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.52] - 2026-01-07
+
+### Fixed
+- Accept comma-separated telegram.admin_ids strings and parse them into IDs.
+
 ## [0.1.51] - 2026-01-07
 
 ### Fixed

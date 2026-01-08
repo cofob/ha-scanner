@@ -24,7 +24,7 @@ generation, and optional print support.
 ## Configuration notes
 
 - `telegram.bot_token` and `telegram.chat_id` enable Telegram delivery and commands.
-- `telegram.admin_ids` allows direct chat access for listed Telegram user IDs.
+- `telegram.admin_ids` allows direct chat access for comma-separated Telegram user IDs.
 - `save_to` controls the base folder (`media` or `share`) for output files.
 - `subdir` is the output subdirectory.
 - `resolution` sets the default scan DPI unless overridden.
