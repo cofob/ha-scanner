@@ -547,11 +547,14 @@ def is_authorized(update: Update) -> bool:
     chat_id = str(update.effective_chat.id)
     if scanner_bot.is_chat_allowed(chat_id):
         return True
+    chat = update.effective_chat
+    user = update.effective_user
     if (
-        update.effective_chat
-        and update.effective_chat.type == "private"
-        and scanner_bot.is_admin_user(
-            update.effective_user.id if update.effective_user else None
+        chat
+        and chat.type == "private"
+        and (
+            scanner_bot.is_admin_user(user.id if user else None)
+            or scanner_bot.is_admin_user(chat.id)
         )
     ):
         return True

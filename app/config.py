@@ -38,17 +38,27 @@ def load_config() -> AppConfig:
         telegram = data.get("telegram")
         if isinstance(telegram, dict):
             admin_ids = telegram.get("admin_ids")
+            parsed_ids: list[int] = []
             if isinstance(admin_ids, str):
-                parsed_ids = []
-                for entry in admin_ids.split(","):
+                raw_entries = admin_ids.split(",")
+            elif isinstance(admin_ids, list):
+                raw_entries = admin_ids
+            elif isinstance(admin_ids, int):
+                raw_entries = [admin_ids]
+            else:
+                raw_entries = []
+            for entry in raw_entries:
+                if entry is None:
+                    continue
+                if isinstance(entry, str):
                     entry = entry.strip()
                     if not entry:
                         continue
-                    try:
-                        parsed_ids.append(int(entry))
-                    except ValueError:
-                        continue
-                telegram["admin_ids"] = parsed_ids
+                try:
+                    parsed_ids.append(int(entry))
+                except (TypeError, ValueError):
+                    continue
+            telegram["admin_ids"] = parsed_ids
         return AppConfig(**data)
     except Exception as e:
         print(f"Warning: Failed to load options.json, using defaults: {e}")

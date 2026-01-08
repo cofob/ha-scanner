@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.53] - 2026-01-07
+
+### Fixed
+- Normalize telegram.admin_ids parsing and ensure admin access works in private chats.
+
 ## [0.1.52] - 2026-01-07
 
 ### Fixed
