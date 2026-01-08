@@ -12,6 +12,7 @@ class TelegramConfig(BaseModel):
     enabled: bool = False
     bot_token: str = ""
     chat_id: str = ""
+    admin_ids: list[int] = Field(default_factory=list)
 
 
 class AppConfig(BaseModel):

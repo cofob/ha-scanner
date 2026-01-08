@@ -120,6 +120,7 @@ The add-on accepts JSON commands via STDIN.
 
 - `telegram.bot_token`: Telegram bot token.
 - `telegram.chat_id`: Authorized chat ID for messaging.
+- `telegram.admin_ids`: Telegram user IDs allowed to use commands via direct chat.
 - `save_to`: `media` or `share` to control output base.
 - `subdir`: Output subdirectory under the base path.
 - `resolution`: Default scan DPI when no override is active.

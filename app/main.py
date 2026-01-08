@@ -111,10 +111,16 @@ class ScannerBot:
 
     DEVICE_CACHE_TTL = timedelta(hours=8)
 
-    def __init__(self, token: str, allowed_chat_ids: list[str] = None):
+    def __init__(
+        self,
+        token: str,
+        allowed_chat_ids: list[str] = None,
+        admin_user_ids: list[int] = None,
+    ):
         """Initialize the bot with token and allowed chat IDs."""
         self.token = token
         self.allowed_chat_ids = allowed_chat_ids or []
+        self.admin_user_ids = {int(user_id) for user_id in (admin_user_ids or [])}
         self.api = None
         self.cached_device_id = None
         self.cached_device_id_expires_at = None
@@ -273,10 +279,16 @@ class ScannerBot:
             return True
         return str(chat_id) in self.allowed_chat_ids
 
+    def is_admin_user(self, user_id: Optional[int]) -> bool:
+        if not user_id:
+            return False
+        return user_id in self.admin_user_ids
+
 
 scanner_bot = ScannerBot(
     config.telegram.bot_token,
     [config.telegram.chat_id] if config.telegram.chat_id else [],
+    config.telegram.admin_ids,
 )
 scan_lock = threading.Lock()
 telegram_sender = Bot(config.telegram.bot_token) if config.telegram.bot_token else None
@@ -534,7 +546,17 @@ def perform_scan(device_id: Optional[str] = None) -> list[Path]:
 def is_authorized(update: Update) -> bool:
     """Check if the user is authorized to use the bot."""
     chat_id = str(update.effective_chat.id)
-    return scanner_bot.is_chat_allowed(chat_id)
+    if scanner_bot.is_chat_allowed(chat_id):
+        return True
+    if (
+        update.effective_chat
+        and update.effective_chat.type == "private"
+        and scanner_bot.is_admin_user(
+            update.effective_user.id if update.effective_user else None
+        )
+    ):
+        return True
+    return False
 
 
 def start_command(update: Update, context: CallbackContext) -> None:

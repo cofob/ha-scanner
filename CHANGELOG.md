@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.49] - 2026-01-07
+
+### Added
+- `telegram.admin_ids` to allow admin users to use bot commands in direct chat.
+
 ## [0.1.48] - 2026-01-07
 
 ### Fixed
