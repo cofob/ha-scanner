@@ -867,14 +867,10 @@ def download_telegram_image(
 def print_image_file(path: Path, monochrome: bool) -> tuple[str, int]:
     if cups is None:
         raise RuntimeError("CUPS Python bindings are not available.")
+    path = prepare_print_path(path, monochrome=monochrome)
     conn = cups.Connection()
     printer_name = resolve_printer_name(conn)
-    options = {
-        "media": "A4",
-        "fit-to-page": "true",
-        "orientation-requested": "3",
-        "print-color-mode": "monochrome" if monochrome else "color",
-    }
+    options = build_print_options(monochrome=monochrome)
     job_id = conn.printFile(
         printer_name,
         str(path),
@@ -882,6 +878,49 @@ def print_image_file(path: Path, monochrome: bool) -> tuple[str, int]:
         options,
     )
     return printer_name, job_id
+
+
+def build_print_options(monochrome: bool) -> dict[str, str]:
+    options = {
+        "media": "A4",
+        "fit-to-page": "true",
+        "orientation-requested": "3",
+        "print-quality": "3",
+    }
+    if monochrome:
+        options.update(
+            {
+                "print-color-mode": "monochrome",
+                "ColorModel": "Gray",
+                "OutputMode": "Grayscale",
+                "cupsColorSpace": "Gray",
+            }
+        )
+    else:
+        options["print-color-mode"] = "color"
+    return options
+
+
+def prepare_print_path(path: Path, monochrome: bool) -> Path:
+    if not monochrome:
+        return path
+    if path.suffix.lower() == ".pdf":
+        return path
+    try:
+        with Image.open(path) as img:
+            if img.mode != "L":
+                img = img.convert("L")
+            suffix = path.suffix.lower()
+            output_path = path.with_name(f"{path.stem}_mono{path.suffix}")
+            save_kwargs = {}
+            if suffix in (".jpg", ".jpeg"):
+                save_kwargs["quality"] = 85
+                save_kwargs["optimize"] = True
+            img.save(output_path, **save_kwargs)
+            return output_path
+    except Exception as exc:
+        logger.warning("Failed to prepare monochrome print file for %s: %s", path, exc)
+        return path
 
 
 def handle_print_command(

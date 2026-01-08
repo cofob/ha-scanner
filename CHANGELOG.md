@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.44] - 2026-01-07
+
+### Changed
+- Printing now applies monochrome-focused job options to speed up black-and-white jobs.
+
 ## [0.1.43] - 2026-01-07
 
 ### Fixed
