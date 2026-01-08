@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.51] - 2026-01-07
+
+### Fixed
+- Fix telegram.admin_ids schema validation for empty lists.
+
 ## [0.1.50] - 2026-01-07
 
 ### Fixed
