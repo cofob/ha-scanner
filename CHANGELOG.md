@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.55] - 2026-01-09
+
+### Fixed
+- Allow admin users to run commands in private chats reliably.
+
 ## [0.1.54] - 2026-01-09
 
 ### Added

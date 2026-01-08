@@ -563,17 +563,18 @@ def perform_scan(device_id: Optional[str] = None) -> list[Path]:
 
 def is_authorized(update: Update) -> bool:
     """Check if the user is authorized to use the bot."""
-    chat_id = str(update.effective_chat.id)
-    if scanner_bot.is_chat_allowed(chat_id):
-        return True
     chat = update.effective_chat
     user = update.effective_user
+    chat_id = chat.id if chat else None
+    user_id = user.id if user else None
+    if chat_id is not None and scanner_bot.is_chat_allowed(str(chat_id)):
+        return True
+    is_private_chat = chat and (chat.type == "private" or chat.id == user_id)
     if (
-        chat
-        and chat.type == "private"
+        is_private_chat
         and (
-            scanner_bot.is_admin_user(user.id if user else None)
-            or scanner_bot.is_admin_user(chat.id)
+            scanner_bot.is_admin_user(user_id)
+            or scanner_bot.is_admin_user(chat_id)
         )
     ):
         return True
