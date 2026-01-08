@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.58] - 2026-01-09
+
+### Added
+- Debug logging for authorization decisions to help diagnose DM access.
+
 ## [0.1.57] - 2026-01-09
 
 ### Changed

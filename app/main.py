@@ -568,6 +568,12 @@ def is_authorized(update: Update) -> bool:
     chat_id = chat.id if chat else None
     user_id = user.id if user else None
     if chat_id is not None and scanner_bot.is_chat_allowed(str(chat_id)):
+        logger.debug(
+            "Authorization granted via chat allowlist (chat_id=%s, user_id=%s, chat_type=%s)",
+            chat_id,
+            user_id,
+            chat.type if chat else None,
+        )
         return True
     is_private_chat = chat and (chat.type == "private" or chat.id == user_id)
     if (
@@ -577,7 +583,21 @@ def is_authorized(update: Update) -> bool:
             or scanner_bot.is_admin_user(chat_id)
         )
     ):
+        logger.debug(
+            "Authorization granted via admin DM (chat_id=%s, user_id=%s, chat_type=%s)",
+            chat_id,
+            user_id,
+            chat.type if chat else None,
+        )
         return True
+    logger.debug(
+        "Authorization denied (chat_id=%s, user_id=%s, chat_type=%s, allowed_chats=%s, admin_ids=%s)",
+        chat_id,
+        user_id,
+        chat.type if chat else None,
+        scanner_bot.allowed_chat_ids,
+        sorted(scanner_bot.admin_user_ids),
+    )
     return False
 
 
