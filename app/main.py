@@ -1333,30 +1333,17 @@ def stdin_socket_server() -> None:
             logger.warning("STDIN socket handling error: %s", exc)
 
 
-def trigger_startup_scan() -> None:
-    log_ha_event("Startup scan requested", level="info")
-    chat_id = parse_chat_id(config.telegram.chat_id)
+def trigger_startup_device_discovery() -> None:
+    log_ha_event("Startup device discovery requested", level="info")
     try:
-        scanned_files = perform_scan()
-        if not scanned_files:
-            log_ha_event("Startup scan completed with no pages.", level="warning")
-            return
-        message_ids: list[int] = []
-        if telegram_sender and chat_id:
-            message_ids = send_scanned_files(
-                telegram_sender,
-                chat_id,
-                scanned_files,
-                "Startup scan from Home Assistant",
-            )
-        queue_scanned_files(scanned_files, chat_id, message_ids or None)
+        devices = scanner_bot.list_scanner_devices()
         log_ha_event(
-            f"Startup scan completed, pages={len(scanned_files)}",
+            f"Startup device discovery completed, devices={len(devices)}",
             level="info",
         )
     except Exception as exc:
-        logger.error("Startup scan failed: %s", exc)
-        log_ha_event(f"Startup scan failed: {exc}", level="error")
+        logger.error("Startup device discovery failed: %s", exc)
+        log_ha_event(f"Startup device discovery failed: {exc}", level="error")
 
 
 def main() -> None:
@@ -1376,12 +1363,12 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Failed to initialize scanner: {e}")
         return
-    startup_thread = threading.Thread(
-        target=trigger_startup_scan,
-        name="startup-scan",
+    discovery_thread = threading.Thread(
+        target=trigger_startup_device_discovery,
+        name="startup-device-discovery",
         daemon=True,
     )
-    startup_thread.start()
+    discovery_thread.start()
     updater = Updater(config.telegram.bot_token, use_context=True)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start_command))
