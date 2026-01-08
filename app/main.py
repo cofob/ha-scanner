@@ -448,11 +448,10 @@ def get_recent_queue_items(chat_id: Optional[int]) -> list[QueuedImage]:
     cutoff = datetime.now() - PDF_QUEUE_WINDOW
     with pdf_queue_lock:
         pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
-        items = [
-            item
-            for item in pdf_queue
-            if chat_id is None or item.chat_id == chat_id
-        ]
+        if chat_id is None:
+            items = [item for item in pdf_queue if item.chat_id is None]
+        else:
+            items = [item for item in pdf_queue if item.chat_id == chat_id]
     return items
 
 

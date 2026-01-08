@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.50] - 2026-01-07
+
+### Fixed
+- Restrict PDF queue usage to the requesting chat (or STDIN-only queue items).
+
 ## [0.1.49] - 2026-01-07
 
 ### Added
