@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.61] - 2026-01-09
+
+### Changed
+- Simplify parsing for `telegram.admin_ids`.
+
 ## [0.1.60] - 2026-01-09
 
 ### Fixed
