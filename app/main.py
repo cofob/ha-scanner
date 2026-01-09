@@ -616,7 +616,13 @@ def send_scanned_files(
 
 def perform_scan(device_id: Optional[str] = None) -> list[Path]:
     with scan_lock:
-        return scanner_bot.scan_document(device_id=device_id)
+        resolved_device_id = device_id or (config.device_id or "").strip() or None
+        logger.debug(
+            "Starting scan (device_id=%s, config_device_id=%s)",
+            device_id,
+            config.device_id,
+        )
+        return scanner_bot.scan_document(device_id=resolved_device_id)
 
 
 def is_authorized(update: Update) -> bool:
