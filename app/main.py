@@ -27,9 +27,6 @@ from telegram.ext import (
 )
 
 
-config = load_config()
-
-
 # Setup GObject introspection for libinsane
 gi.require_version("Libinsane", "1.0")
 from gi.repository import Libinsane
@@ -44,6 +41,16 @@ logger = logging.getLogger(__name__)
 
 
 HA_BASE_URL = "http://supervisor/core"
+
+config = load_config()
+logger.debug(
+    "Loaded config (save_to=%s, subdir=%s, printer_address=%s, printer_name=%s, telegram_admin_ids=%s)",
+    config.save_to,
+    config.subdir,
+    config.printer_address,
+    config.printer_name,
+    config.telegram.admin_ids,
+)
 
 
 class HomeAssistantClient:

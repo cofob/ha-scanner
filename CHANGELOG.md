@@ -2,6 +2,14 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.64] - 2026-01-09
+
+### Added
+- Debug logging for parsed configuration values (including admin IDs).
+
+### Fixed
+- Parse the full options.json config via Pydantic models.
+
 ## [0.1.63] - 2026-01-09
 
 ### Added
