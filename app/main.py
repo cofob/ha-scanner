@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Telegram bot for scanning documents using libinsane."""
 
+import io
 import json
 import logging
 import os
@@ -104,6 +105,7 @@ RESOLUTION_PRESETS = {
     "xhigh": 1200,
 }
 TEMP_OUTPUT_BASE = Path("/tmp/ha_scanner")
+MAX_TELEGRAM_PHOTO_BYTES = 10 * 1024 * 1024
 
 
 @dataclass
@@ -593,17 +595,66 @@ def send_scanned_files(
 ) -> list[int]:
     if not scanned_files:
         return []
+
+    def build_photo_payload(path: Path) -> bytes:
+        data = path.read_bytes()
+        if len(data) <= MAX_TELEGRAM_PHOTO_BYTES:
+            return data
+        try:
+            with Image.open(path) as img:
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+                quality = 85
+                scale = 1.0
+                while True:
+                    buf = io.BytesIO()
+                    if scale < 1.0:
+                        resized = img.resize(
+                            (int(img.width * scale), int(img.height * scale)),
+                            Image.LANCZOS,
+                        )
+                    else:
+                        resized = img
+                    resized.save(buf, format="JPEG", quality=quality, optimize=True)
+                    if buf.tell() <= MAX_TELEGRAM_PHOTO_BYTES:
+                        logger.debug(
+                            "Compressed %s from %d to %d bytes (quality=%s, scale=%.2f)",
+                            path,
+                            len(data),
+                            buf.tell(),
+                            quality,
+                            scale,
+                        )
+                        return buf.getvalue()
+                    if quality > 40:
+                        quality -= 10
+                    else:
+                        scale -= 0.1
+                        if scale <= 0.6:
+                            logger.debug(
+                                "Compressed %s from %d to %d bytes (quality=%s, scale=%.2f)",
+                                path,
+                                len(data),
+                                buf.tell(),
+                                quality,
+                                scale,
+                            )
+                            return buf.getvalue()
+        except Exception as exc:
+            logger.warning("Failed to compress %s: %s", path, exc)
+        return data
+
     if len(scanned_files) == 1:
-        with open(scanned_files[0], "rb") as photo:
-            message = bot.send_photo(
-                photo=photo,
-                chat_id=chat_id,
-                caption=caption_prefix,
-            )
+        photo_bytes = build_photo_payload(scanned_files[0])
+        message = bot.send_photo(
+            photo=photo_bytes,
+            chat_id=chat_id,
+            caption=caption_prefix,
+        )
         return [message.message_id]
     media_group = []
     for i, file_path in enumerate(scanned_files):
-        file_bytes = file_path.read_bytes()
+        file_bytes = build_photo_payload(file_path)
         media_group.append(
             InputMediaPhoto(
                 media=file_bytes,

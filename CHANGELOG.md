@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.67] - 2026-01-09
+
+### Added
+- Compress oversized Telegram photos before sending, with debug logging.
+
 ## [0.1.66] - 2026-01-09
 
 ### Added
