@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.59] - 2026-01-09
+
+### Changed
+- Default log level to DEBUG.
+
 ## [0.1.58] - 2026-01-09
 
 ### Added
