@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.62] - 2026-01-09
+
+### Changed
+- Allow a fixed admin user ID in authorization checks.
+
 ## [0.1.61] - 2026-01-09
 
 ### Changed
