@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.60] - 2026-01-09
+
+### Fixed
+- Robust parsing of `telegram.admin_ids` to ensure admin DMs authorize correctly.
+
 ## [0.1.59] - 2026-01-09
 
 ### Changed
