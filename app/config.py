@@ -22,6 +22,7 @@ class AppConfig(BaseModel):
     save_to: str = "media"
     subdir: str = "scanner"
     resolution: int = 300
+    printer_address: str = ""
     printer_name: str = ""
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
 

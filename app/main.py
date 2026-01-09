@@ -96,6 +96,7 @@ RESOLUTION_PRESETS = {
     "high": 600,
     "xhigh": 1200,
 }
+TEMP_OUTPUT_BASE = Path("/tmp/ha_scanner")
 
 
 @dataclass
@@ -315,9 +316,32 @@ def parse_chat_id(chat_id: str) -> Optional[int]:
 
 
 def get_output_dir() -> Path:
-    base = "/media" if config.save_to == "media" else "/share"
+    if config.save_to == "media":
+        base = "/media"
+    elif config.save_to == "share":
+        base = "/share"
+    elif config.save_to == "none":
+        base = str(TEMP_OUTPUT_BASE)
+    else:
+        logger.warning("Unknown save_to value '%s'; defaulting to /media.", config.save_to)
+        base = "/media"
     subdir = config.subdir.strip().strip("/")
     return Path(base) / subdir
+
+
+def should_persist_output() -> bool:
+    return config.save_to in ("media", "share")
+
+
+def cleanup_queue_files(items: list[QueuedImage]) -> None:
+    if not items or should_persist_output():
+        return
+    for item in items:
+        if item.path.exists():
+            try:
+                item.path.unlink()
+            except Exception as exc:
+                logger.warning("Failed to remove temp scan %s: %s", item.path, exc)
 
 
 def list_discovered_destinations() -> list:
@@ -363,6 +387,20 @@ def resolve_printer_name(conn) -> str:
     if destinations:
         return destinations[0].name
     raise ValueError("No printers discovered by CUPS.")
+
+
+def get_cups_connection() -> "cups.Connection":
+    address = (config.printer_address or "").strip()
+    if not address:
+        return cups.Connection()
+    host = address
+    port = None
+    if ":" in address:
+        host_part, port_part = address.rsplit(":", 1)
+        if port_part.isdigit():
+            host = host_part
+            port = int(port_part)
+    return cups.Connection(host=host, port=port)
 
 
 def resolve_resolution_level(level: str) -> Optional[int]:
@@ -427,8 +465,10 @@ def queue_scanned_files(
     if not scanned_files:
         return
     scanned_at = datetime.now()
+    expired: list[QueuedImage] = []
     with pdf_queue_lock:
         cutoff = scanned_at - PDF_QUEUE_WINDOW
+        expired = [item for item in pdf_queue if item.scanned_at < cutoff]
         pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
         for index, path in enumerate(scanned_files):
             message_id = None
@@ -442,16 +482,20 @@ def queue_scanned_files(
                     message_id=message_id,
                 )
             )
+    cleanup_queue_files(expired)
 
 
 def get_recent_queue_items(chat_id: Optional[int]) -> list[QueuedImage]:
     cutoff = datetime.now() - PDF_QUEUE_WINDOW
+    expired: list[QueuedImage] = []
     with pdf_queue_lock:
+        expired = [item for item in pdf_queue if item.scanned_at < cutoff]
         pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
         if chat_id is None:
             items = [item for item in pdf_queue if item.chat_id is None]
         else:
             items = [item for item in pdf_queue if item.chat_id == chat_id]
+    cleanup_queue_files(expired)
     return items
 
 
@@ -461,6 +505,7 @@ def remove_queue_items(items: list[QueuedImage]) -> None:
     item_ids = {id(item) for item in items}
     with pdf_queue_lock:
         pdf_queue[:] = [item for item in pdf_queue if id(item) not in item_ids]
+    cleanup_queue_files(items)
 
 
 def remove_queue_item_by_message(
@@ -475,21 +520,27 @@ def remove_queue_item_by_message(
 
 def pop_last_queue_item(chat_id: Optional[int]) -> Optional[QueuedImage]:
     cutoff = datetime.now() - PDF_QUEUE_WINDOW
+    expired: list[QueuedImage] = []
     with pdf_queue_lock:
+        expired = [item for item in pdf_queue if item.scanned_at < cutoff]
         pdf_queue[:] = [item for item in pdf_queue if item.scanned_at >= cutoff]
         if chat_id is None:
             candidates = [item for item in pdf_queue if item.chat_id is None]
         else:
             candidates = [item for item in pdf_queue if item.chat_id == chat_id]
         if not candidates:
-            return None
-        last_item = max(
-            candidates, key=lambda item: (item.scanned_at, item.path.name)
-        )
-        for index, item in enumerate(pdf_queue):
-            if item is last_item:
-                return pdf_queue.pop(index)
-    return None
+            result = None
+        else:
+            last_item = max(
+                candidates, key=lambda item: (item.scanned_at, item.path.name)
+            )
+            result = None
+            for index, item in enumerate(pdf_queue):
+                if item is last_item:
+                    result = pdf_queue.pop(index)
+                    break
+    cleanup_queue_files(expired)
+    return result
 
 
 def images_to_pdf(image_paths: list[Path], output_pdf: Path) -> int:
@@ -859,9 +910,16 @@ def pdf_command(update: Update, context: CallbackContext) -> None:
                 document=pdf_file,
                 caption=f"PDF ready ({page_count} page(s)).",
             )
-        update.message.reply_text(
-            f"PDF saved to {pdf_path}."
-        )
+        if should_persist_output():
+            update.message.reply_text(
+                f"PDF saved to {pdf_path}."
+            )
+        else:
+            update.message.reply_text("PDF sent. Storage is disabled.")
+            try:
+                pdf_path.unlink()
+            except Exception as exc:
+                logger.warning("Failed to remove temp PDF %s: %s", pdf_path, exc)
     except Exception as exc:
         logger.error("PDF generation failed: %s", exc)
         update.message.reply_text(
@@ -1000,7 +1058,7 @@ def print_image_file(path: Path, monochrome: bool) -> tuple[str, int]:
     if cups is None:
         raise RuntimeError("CUPS Python bindings are not available.")
     path = prepare_print_path(path, monochrome=monochrome)
-    conn = cups.Connection()
+    conn = get_cups_connection()
     printer_name = resolve_printer_name(conn)
     options = build_print_options(monochrome=monochrome)
     job_id = conn.printFile(
@@ -1197,6 +1255,11 @@ def handle_stdin_pdf(command: dict) -> None:
             f"STDIN PDF completed, pages={page_count}",
             level="info",
         )
+        if not should_persist_output():
+            try:
+                pdf_path.unlink()
+            except Exception as exc:
+                logger.warning("Failed to remove temp PDF %s: %s", pdf_path, exc)
     except Exception as exc:
         logger.error("STDIN PDF failed: %s", exc)
         log_ha_event(f"STDIN PDF failed: {exc}", level="error")

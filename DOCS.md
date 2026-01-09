@@ -4,11 +4,11 @@ This add-on provides Telegram and Home Assistant automation support for scanning
 
 ## Core Features
 
-- Scan documents with libinsane and save them to disk.
+- Scan documents with libinsane and optionally save them to disk.
 - Telegram bot commands for scanning, device listing, PDF creation, and cleanup.
 - Telegram commands to print attached images via CUPS.
 - Home Assistant automation support via STDIN commands.
-- Outputs saved to `/media/<subdir>` or `/share/<subdir>` based on config.
+- Outputs saved to `/media/<subdir>` or `/share/<subdir>` based on config (or kept temporary when storage is disabled).
 - Temporary DPI overrides via Telegram or STDIN commands.
 
 ## Output and Storage
@@ -16,6 +16,7 @@ This add-on provides Telegram and Home Assistant automation support for scanning
 - Output directory is determined by:
   - `save_to: media` -> `/media/<subdir>`
   - `save_to: share` -> `/share/<subdir>`
+- `save_to: none` uses a temporary `/tmp/ha_scanner/<subdir>` location and removes files when they fall out of the PDF queue.
 - Each scan page is saved as a PNG file with a timestamped name.
 - PDFs are saved in the same output folder.
 
@@ -48,7 +49,7 @@ This add-on provides Telegram and Home Assistant automation support for scanning
   - Send the command as a caption to an image/PDF or reply to one.
 - `/pdf`
   - Combines queued scans from the last 30 minutes into a single PDF.
-  - Sends the PDF to the chat and saves it to the output folder.
+  - Sends the PDF to the chat and saves it to the output folder (unless storage is disabled).
   - Clears the queued items used for the PDF.
 - `/delete`
   - Reply to a scan message to delete it from chat.
@@ -74,7 +75,7 @@ The add-on accepts JSON commands via STDIN.
 ```
 
 - Performs a scan using the specified device (or default).
-- Saves scan pages to disk.
+- Saves scan pages to disk unless storage is disabled.
 - Sends scanned images to Telegram if `notify_telegram` is true.
 - Adds scanned pages to the PDF queue.
 
@@ -100,7 +101,7 @@ The add-on accepts JSON commands via STDIN.
 
 - Builds a PDF from scans in the last 30 minutes.
 - Sends the PDF to Telegram if configured.
-- Saves the PDF to the output folder.
+- Saves the PDF to the output folder unless storage is disabled.
 - Clears the queued items used for the PDF.
 
 ### Delete Last Scan
@@ -131,9 +132,10 @@ The add-on accepts JSON commands via STDIN.
 - `telegram.bot_token`: Telegram bot token.
 - `telegram.chat_id`: Authorized chat ID for messaging.
 - `telegram.admin_ids`: Comma-separated Telegram user IDs allowed to use commands via direct chat.
-- `save_to`: `media` or `share` to control output base.
+- `save_to`: `media`, `share`, or `none` to control output storage.
 - `subdir`: Output subdirectory under the base path.
 - `resolution`: Default scan DPI when no override is active.
+- `printer_address`: Optional CUPS server hostname/IP (use `host:port` if needed).
 - `printer_name`: Optional CUPS printer/queue name. If empty, the first available
   printer discovered by CUPS is used.
 

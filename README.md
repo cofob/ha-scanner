@@ -5,7 +5,7 @@ generation, and optional print support.
 
 ## Features
 
-- Scan with libinsane/SANE and save to `/media/<subdir>` or `/share/<subdir>`.
+- Scan with libinsane/SANE and save to `/media/<subdir>` or `/share/<subdir>` (or keep output temporary).
 - Telegram bot commands for scan, device listing, PDF creation, and cleanup.
 - Print attached images or PDFs via CUPS (`/print` and `/print_color`).
 - Scan-and-print workflows (`/copy` and `/copy_color`).
@@ -25,9 +25,10 @@ generation, and optional print support.
 
 - `telegram.bot_token` and `telegram.chat_id` enable Telegram delivery and commands.
 - `telegram.admin_ids` allows direct chat access for comma-separated Telegram user IDs.
-- `save_to` controls the base folder (`media` or `share`) for output files.
+- `save_to` controls the base folder (`media`, `share`, or `none`) for output files.
 - `subdir` is the output subdirectory.
 - `resolution` sets the default scan DPI unless overridden.
+- `printer_address` sets the CUPS server hostname/IP (use `host:port` if needed).
 - `printer_name` is optional; if empty, the first available CUPS printer is used.
 
 ## Usage

@@ -2,6 +2,12 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.63] - 2026-01-09
+
+### Added
+- Allow disabling on-disk scan storage with `save_to: none`.
+- Add `printer_address` to connect to a custom CUPS server host.
+
 ## [0.1.62] - 2026-01-09
 
 ### Changed
