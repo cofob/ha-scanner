@@ -13,9 +13,12 @@ FILENAME_PATTERN=$(bashio::config "filename_pattern")
 SAVE_TO=$(bashio::config "save_to")
 SUBDIR=$(bashio::config "subdir")
 RESOLUTION=$(bashio::config "resolution")
+PRINTER_ADDRESS=$(bashio::config "printer_address")
+PRINTER_NAME=$(bashio::config "printer_name")
 TELEGRAM_ENABLED=$(bashio::config "telegram.enabled")
 TELEGRAM_BOT_TOKEN=$(bashio::config "telegram.bot_token")
 TELEGRAM_CHAT_ID=$(bashio::config "telegram.chat_id")
+TELEGRAM_ADMIN_IDS=$(bashio::config "telegram.admin_ids")
 TELEGRAM_CAPTION=$(bashio::config "telegram.caption")
 TELEGRAM_USE_ALBUM=$(bashio::config "telegram.use_album")
 
@@ -33,10 +36,13 @@ cat > /data/options.json <<EOF
   "save_to": "$SAVE_TO",
   "subdir": "$SUBDIR",
   "resolution": $RESOLUTION,
+  "printer_address": "$PRINTER_ADDRESS",
+  "printer_name": "$PRINTER_NAME",
   "telegram": {
     "enabled": $TELEGRAM_ENABLED,
     "bot_token": "$TELEGRAM_BOT_TOKEN",
     "chat_id": "$TELEGRAM_CHAT_ID",
+    "admin_ids": "$TELEGRAM_ADMIN_IDS",
     "caption": "$TELEGRAM_CAPTION",
     "use_album": $TELEGRAM_USE_ALBUM
   }

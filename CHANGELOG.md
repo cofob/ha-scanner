@@ -2,6 +2,11 @@
 
 All notable changes to the Libinsane Scanner add-on will be documented in this file.
 
+## [0.1.65] - 2026-01-09
+
+### Fixed
+- Write printer/admin settings into `/data/options.json` for proper config loading.
+
 ## [0.1.64] - 2026-01-09
 
 ### Added
